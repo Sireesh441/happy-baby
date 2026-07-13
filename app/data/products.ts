@@ -13,6 +13,7 @@ export type Product = {
   category: Category;
   emoji: string;
   color: string;
+  image?: string;
 };
 
 export type CategoryMeta = {
@@ -37,7 +38,7 @@ export function getCategoryBySlug(slug: string): CategoryMeta | undefined {
 }
 
 export const PRODUCTS: Product[] = [
-  { id: 1, name: "Pampers Premium Care Pants, Size M (78pcs)", price: 799, originalPrice: 899, rating: 4.5, reviewCount: 2340, tag: "Bestseller", category: "Diapers", emoji: "🧷", color: "bg-sky-100" },
+  { id: 1, name: "Pampers Premium Care Pants, Size M (78pcs)", price: 799, originalPrice: 899, rating: 4.5, reviewCount: 2340, tag: "Bestseller", category: "Diapers", emoji: "🧷", color: "bg-sky-100", image: "/products/pampers-premium-care-pants.jpg" },
   { id: 2, name: "Huggies Wonder Pants, Size L (46pcs)", price: 649, rating: 4.3, reviewCount: 1876, category: "Diapers", emoji: "🧷", color: "bg-sky-100" },
   { id: 3, name: "Mamaearth Bamboo Diaper Pants, Size S (72pcs)", price: 699, rating: 4.6, reviewCount: 980, tag: "New", category: "Diapers", emoji: "🧷", color: "bg-sky-100" },
   { id: 4, name: "Sirona Reusable Swim Diaper", price: 399, rating: 4.1, reviewCount: 320, category: "Diapers", emoji: "🧷", color: "bg-sky-100" },

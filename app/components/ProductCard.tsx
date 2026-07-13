@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Product, Tag } from "../data/products";
 
 const TAG_STYLES: Record<Tag, string> = {
@@ -31,6 +32,22 @@ export default function ProductCard({ product }: { product: Product }) {
           "from-"
         )} to-white`}
       >
+        {product.image ? (
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="text-7xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
+          >
+            {product.emoji}
+          </span>
+        )}
         {product.tag && (
           <span
             className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ${TAG_STYLES[product.tag]}`}
@@ -43,12 +60,6 @@ export default function ProductCard({ product }: { product: Product }) {
             -{discountPercent}%
           </span>
         )}
-        <span
-          aria-hidden="true"
-          className="text-7xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
-        >
-          {product.emoji}
-        </span>
       </div>
 
       <div className="flex flex-1 flex-col p-4">
