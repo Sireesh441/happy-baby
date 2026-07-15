@@ -39,7 +39,7 @@ export default async function ProductDetailPage({
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
           <div className="grid gap-10 md:grid-cols-2">
             <div
-              className={`relative flex h-80 items-center justify-center overflow-hidden rounded-3xl bg-linear-to-br sm:h-[28rem] ${product.color.replace(
+              className={`relative flex h-80 items-center justify-center overflow-hidden rounded-3xl bg-linear-to-br sm:h-112 ${product.color.replace(
                 "bg-",
                 "from-"
               )} to-white`}
@@ -101,7 +101,7 @@ export default async function ProductDetailPage({
               <p className="mt-4 text-slate-600">{product.description}</p>
 
               <div className="mt-8">
-                <AddToCartControls />
+                <AddToCartControls productId={product.id} />
               </div>
             </div>
           </div>

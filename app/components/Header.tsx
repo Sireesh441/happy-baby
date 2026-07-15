@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useCart } from "../context/CartContext";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
@@ -11,6 +12,7 @@ const NAV_LINKS = [
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { itemCount } = useCart();
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">
@@ -33,9 +35,14 @@ export default function Header() {
         <div className="hidden items-center gap-4 md:flex">
           <Link
             href="/cart"
-            className="flex items-center gap-1 text-sm font-semibold text-slate-600 transition-colors hover:text-pink-500"
+            className="relative flex items-center gap-1 text-sm font-semibold text-slate-600 transition-colors hover:text-pink-500"
           >
             <span aria-hidden="true">🛒</span> Cart
+            {itemCount > 0 && (
+              <span className="absolute -right-3 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-pink-500 text-[10px] font-bold text-white">
+                {itemCount}
+              </span>
+            )}
           </Link>
           <Link
             href="/login"
@@ -71,9 +78,14 @@ export default function Header() {
           <Link
             href="/cart"
             onClick={() => setMenuOpen(false)}
-            className="rounded-lg px-2 py-3 transition-colors hover:bg-pink-50 hover:text-pink-500"
+            className="flex items-center justify-between rounded-lg px-2 py-3 transition-colors hover:bg-pink-50 hover:text-pink-500"
           >
-            🛒 Cart
+            <span>🛒 Cart</span>
+            {itemCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-pink-500 text-xs font-bold text-white">
+                {itemCount}
+              </span>
+            )}
           </Link>
           <Link
             href="/login"

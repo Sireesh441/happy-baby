@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Product, Tag } from "../data/products";
+import { useCart } from "../context/CartContext";
 
 const TAG_STYLES: Record<Tag, string> = {
   Bestseller: "bg-amber-400 text-amber-950",
@@ -13,10 +14,12 @@ const TAG_STYLES: Record<Tag, string> = {
 
 export default function ProductCard({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
+  const { addItem } = useCart();
 
   function handleAddToCart(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
+    addItem(product.id, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }
