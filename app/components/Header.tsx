@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { useCart } from "../context/CartContext";
 
 const NAV_LINKS = [
@@ -13,6 +14,7 @@ const NAV_LINKS = [
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
+  const { data: session, status } = useSession();
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">
@@ -44,12 +46,27 @@ export default function Header() {
               </span>
             )}
           </Link>
-          <Link
-            href="/login"
-            className="rounded-full bg-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600"
-          >
-            Login
-          </Link>
+          {status === "authenticated" ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-slate-700">
+                Hi, {session.user?.name?.split(" ")[0]}
+              </span>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="rounded-full border-2 border-pink-200 px-5 py-2 text-sm font-semibold text-pink-500 transition-colors hover:bg-pink-50"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-full bg-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600"
+            >
+              Login
+            </Link>
+          )}
         </div>
 
         <button
@@ -87,13 +104,31 @@ export default function Header() {
               </span>
             )}
           </Link>
-          <Link
-            href="/login"
-            onClick={() => setMenuOpen(false)}
-            className="mt-2 rounded-full bg-pink-500 px-5 py-3 text-center text-white shadow-sm transition-colors hover:bg-pink-600"
-          >
-            Login
-          </Link>
+          {status === "authenticated" ? (
+            <>
+              <span className="px-2 py-2 text-slate-700">
+                Hi, {session.user?.name?.split(" ")[0]}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  signOut({ callbackUrl: "/" });
+                }}
+                className="mt-2 rounded-full border-2 border-pink-200 px-5 py-3 text-center text-pink-500 transition-colors hover:bg-pink-50"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              onClick={() => setMenuOpen(false)}
+              className="mt-2 rounded-full bg-pink-500 px-5 py-3 text-center text-white shadow-sm transition-colors hover:bg-pink-600"
+            >
+              Login
+            </Link>
+          )}
         </nav>
       )}
     </header>
