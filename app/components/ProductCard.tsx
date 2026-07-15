@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import type { Product, Tag } from "../data/products";
 
 const TAG_STYLES: Record<Tag, string> = {
@@ -13,7 +14,9 @@ const TAG_STYLES: Record<Tag, string> = {
 export default function ProductCard({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
 
-  function handleAddToCart() {
+  function handleAddToCart(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }
@@ -25,7 +28,10 @@ export default function ProductCard({ product }: { product: Product }) {
   const filledStars = Math.round(product.rating);
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <Link
+      href={`/shop/${product.id}`}
+      className="group flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+    >
       <div
         className={`relative flex h-44 items-center justify-center overflow-hidden bg-linear-to-br ${product.color.replace(
           "bg-",
@@ -102,6 +108,6 @@ export default function ProductCard({ product }: { product: Product }) {
           {added ? "Added ✓" : "Add to Cart"}
         </button>
       </div>
-    </div>
+    </Link>
   );
 }
