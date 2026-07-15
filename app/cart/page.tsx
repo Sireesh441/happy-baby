@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Script from "next/script";
@@ -9,7 +9,7 @@ import { useSession } from "next-auth/react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
-import { PRODUCTS } from "../data/products";
+import type { Product } from "../data/products";
 import { saveLastOrder } from "../lib/orderStorage";
 import type { RazorpayPaymentResponse } from "../../types/razorpay";
 
@@ -17,15 +17,23 @@ export default function CartPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const { items, itemCount, updateQuantity, removeItem, clearCart } = useCart();
+  const [products, setProducts] = useState<Product[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch("/api/products")
+      .then((response) => response.json())
+      .then(setProducts)
+      .catch(() => setProducts([]));
+  }, []);
+
   const lines = items
     .map((item) => {
-      const product = PRODUCTS.find((p) => p.id === item.id);
+      const product = products.find((p) => p.id === item.id);
       return product ? { product, quantity: item.quantity } : null;
     })
-    .filter((line): line is { product: (typeof PRODUCTS)[number]; quantity: number } => line !== null);
+    .filter((line): line is { product: Product; quantity: number } => line !== null);
 
   const subtotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
 

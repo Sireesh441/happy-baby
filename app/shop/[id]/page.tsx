@@ -4,10 +4,10 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
 import AddToCartControls from "../../components/AddToCartControls";
-import { PRODUCTS } from "../../data/products";
+import { getAllProducts, getProductById, getProductsByCategory } from "../../../lib/products";
 
 export function generateStaticParams() {
-  return PRODUCTS.map((product) => ({ id: String(product.id) }));
+  return getAllProducts().map((product) => ({ id: String(product.id) }));
 }
 
 export default async function ProductDetailPage({
@@ -16,7 +16,7 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = PRODUCTS.find((item) => item.id === Number(id));
+  const product = getProductById(Number(id));
 
   if (!product) {
     notFound();
@@ -28,9 +28,9 @@ export default async function ProductDetailPage({
 
   const filledStars = Math.round(product.rating);
 
-  const relatedProducts = PRODUCTS.filter(
-    (item) => item.category === product.category && item.id !== product.id
-  ).slice(0, 4);
+  const relatedProducts = getProductsByCategory(product.category)
+    .filter((item) => item.id !== product.id)
+    .slice(0, 4);
 
   return (
     <>

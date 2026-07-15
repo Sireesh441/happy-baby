@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useCart } from "../context/CartContext";
+import { isAdminEmail } from "../../lib/admin";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
@@ -48,6 +49,14 @@ export default function Header() {
           </Link>
           {status === "authenticated" ? (
             <div className="flex items-center gap-3">
+              {isAdminEmail(session.user?.email) && (
+                <Link
+                  href="/admin"
+                  className="text-sm font-semibold text-slate-600 transition-colors hover:text-pink-500"
+                >
+                  Admin
+                </Link>
+              )}
               <span className="text-sm font-semibold text-slate-700">
                 Hi, {session.user?.name?.split(" ")[0]}
               </span>
@@ -106,6 +115,15 @@ export default function Header() {
           </Link>
           {status === "authenticated" ? (
             <>
+              {isAdminEmail(session.user?.email) && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-lg px-2 py-3 transition-colors hover:bg-pink-50 hover:text-pink-500"
+                >
+                  Admin
+                </Link>
+              )}
               <span className="px-2 py-2 text-slate-700">
                 Hi, {session.user?.name?.split(" ")[0]}
               </span>

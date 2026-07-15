@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const dbPath = path.join(process.cwd(), "data", "app.db");
 
-const db = new DatabaseSync(dbPath);
+export const db = new DatabaseSync(dbPath);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (

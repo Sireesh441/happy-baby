@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES, PRODUCTS, type Category } from "../data/products";
+import { CATEGORIES, type Category, type Product } from "../data/products";
 import ProductCard from "./ProductCard";
 
 type Filter = "All" | Category;
 
 const FILTERS: Filter[] = ["All", ...CATEGORIES];
 
-export default function ProductGrid() {
+export default function ProductGrid({ products }: { products: Product[] }) {
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
 
   const filteredProducts =
     activeFilter === "All"
-      ? PRODUCTS
-      : PRODUCTS.filter((product) => product.category === activeFilter);
+      ? products
+      : products.filter((product) => product.category === activeFilter);
 
   return (
     <div>

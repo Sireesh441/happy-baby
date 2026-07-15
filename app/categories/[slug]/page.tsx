@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
-import { CATEGORY_META, PRODUCTS, getCategoryBySlug } from "../../data/products";
+import { CATEGORY_META, getCategoryBySlug } from "../../data/products";
+import { getProductsByCategory } from "../../../lib/products";
 
 export function generateStaticParams() {
   return CATEGORY_META.map((category) => ({ slug: category.slug }));
@@ -20,7 +21,7 @@ export default async function CategoryPage({
     notFound();
   }
 
-  const products = PRODUCTS.filter((product) => product.category === category.name);
+  const products = getProductsByCategory(category.name);
 
   return (
     <>
