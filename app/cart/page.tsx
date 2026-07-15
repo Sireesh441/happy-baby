@@ -3,14 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
 import { PRODUCTS } from "../data/products";
+import { saveLastOrder } from "../lib/orderStorage";
+import type { RazorpayPaymentResponse } from "../../types/razorpay";
 
 export default function CartPage() {
+  const router = useRouter();
+  const { data: session } = useSession();
   const { items, itemCount, updateQuantity, removeItem, clearCart } = useCart();
-  const [checkedOut, setCheckedOut] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const lines = items
     .map((item) => {
@@ -21,35 +29,98 @@ export default function CartPage() {
 
   const subtotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
 
-  function handleCheckout() {
-    clearCart();
-    setCheckedOut(true);
+  async function handleCheckout() {
+    setCheckoutError(null);
+    setPlacingOrder(true);
+
+    try {
+      const orderResponse = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: subtotal }),
+      });
+
+      if (!orderResponse.ok) {
+        const data = await orderResponse.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not start checkout.");
+      }
+
+      const order = await orderResponse.json();
+
+      if (typeof window.Razorpay !== "function") {
+        throw new Error("Payment gateway failed to load. Please try again.");
+      }
+
+      const checkout = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "HappyBaby",
+        description: `Order for ${itemCount} item${itemCount > 1 ? "s" : ""}`,
+        prefill: {
+          name: session?.user?.name ?? undefined,
+          email: session?.user?.email ?? undefined,
+        },
+        theme: { color: "#ec4899" },
+        handler: async (response: RazorpayPaymentResponse) => {
+          const verifyResponse = await fetch("/api/razorpay/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(response),
+          });
+
+          if (!verifyResponse.ok) {
+            setCheckoutError("Payment verification failed. Please contact support.");
+            setPlacingOrder(false);
+            return;
+          }
+
+          saveLastOrder({
+            orderId: response.razorpay_order_id,
+            paymentId: response.razorpay_payment_id,
+            items: lines.map(({ product, quantity }) => ({
+              id: product.id,
+              name: product.name,
+              quantity,
+              price: product.price,
+              image: product.image,
+              emoji: product.emoji,
+              color: product.color,
+            })),
+            total: subtotal,
+            createdAt: new Date().toISOString(),
+          });
+
+          clearCart();
+          router.push("/order-confirmation");
+        },
+        modal: {
+          ondismiss: () => setPlacingOrder(false),
+        },
+      });
+
+      checkout.on("payment.failed", () => {
+        setCheckoutError("Payment failed. Please try again.");
+        setPlacingOrder(false);
+      });
+
+      checkout.open();
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "Something went wrong.");
+      setPlacingOrder(false);
+    }
   }
 
   return (
     <>
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <Header />
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
           <h1 className="mb-8 text-3xl font-bold text-slate-800">Your Cart</h1>
 
-          {checkedOut ? (
-            <div className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-white py-20 text-center shadow-sm">
-              <span className="text-6xl" aria-hidden="true">
-                🎉
-              </span>
-              <p className="text-lg font-semibold text-slate-700">Order placed!</p>
-              <p className="max-w-sm text-slate-500">
-                This is a demo checkout — no real order was placed or charged.
-              </p>
-              <Link
-                href="/shop"
-                className="mt-3 rounded-full bg-pink-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600"
-              >
-                Continue Shopping
-              </Link>
-            </div>
-          ) : lines.length === 0 ? (
+          {lines.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-white py-20 text-center shadow-sm">
               <span className="text-6xl" aria-hidden="true">
                 🛒
@@ -158,12 +229,18 @@ export default function CartPage() {
                   <span>Total</span>
                   <span>₹{subtotal.toLocaleString("en-IN")}</span>
                 </div>
+
+                {checkoutError && (
+                  <p className="mt-4 text-sm font-medium text-red-500">{checkoutError}</p>
+                )}
+
                 <button
                   type="button"
                   onClick={handleCheckout}
-                  className="mt-6 w-full rounded-full bg-pink-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600"
+                  disabled={placingOrder}
+                  className="mt-6 w-full rounded-full bg-pink-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:opacity-60"
                 >
-                  Proceed to Checkout
+                  {placingOrder ? "Processing..." : "Proceed to Checkout"}
                 </button>
               </div>
             </div>
