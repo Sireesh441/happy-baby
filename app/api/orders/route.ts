@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   }
 
-  const orders = getOrdersForUser(Number(session.user.id));
+  const orders = await getOrdersForUser(Number(session.user.id));
   return NextResponse.json(orders);
 }
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const cartId = await getExistingCartId();
-  const lines = cartId ? getCart(cartId) : [];
+  const lines = cartId ? await getCart(cartId) : [];
 
   if (lines.length === 0) {
     return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const total = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
   const session = await getSession();
 
-  const order = createOrder({
+  const order = await createOrder({
     userId: session?.user?.id ? Number(session.user.id) : null,
     razorpayOrderId: razorpay_order_id,
     razorpayPaymentId: razorpay_payment_id,
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   });
 
   if (cartId) {
-    clearCart(cartId);
+    await clearCart(cartId);
   }
 
   return NextResponse.json(order, { status: 201 });

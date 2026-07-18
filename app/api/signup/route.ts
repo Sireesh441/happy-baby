@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (getUserByEmail(email)) {
+  if (await getUserByEmail(email)) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
       { status: 409 }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = createUser(name.trim(), email.trim(), passwordHash);
+  const user = await createUser(name.trim(), email.trim(), passwordHash);
 
   return NextResponse.json({ id: user.id, name: user.name, email: user.email }, { status: 201 });
 }

@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = getUserByEmail(credentials.email);
+        const user = await getUserByEmail(credentials.email);
         if (!user) {
           return null;
         }

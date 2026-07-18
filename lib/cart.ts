@@ -1,17 +1,6 @@
-import { db } from "./db";
-import { getProductById } from "./products";
+import { prisma } from "./prisma";
+import { toProduct } from "./products";
 import type { Product } from "../app/data/products";
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS cart_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cart_id TEXT NOT NULL,
-    product_id INTEGER NOT NULL,
-    quantity INTEGER NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(cart_id, product_id)
-  )
-`);
 
 export type CartLine = {
   productId: number;
@@ -19,68 +8,49 @@ export type CartLine = {
   product: Product;
 };
 
-type CartItemRow = {
-  id: number;
-  cart_id: string;
-  product_id: number;
-  quantity: number;
-};
+export async function getCart(cartId: string): Promise<CartLine[]> {
+  const rows = await prisma.cartItem.findMany({
+    where: { cartId },
+    include: { product: true },
+    orderBy: { id: "asc" },
+  });
 
-export function getCart(cartId: string): CartLine[] {
-  const rows = db
-    .prepare("SELECT * FROM cart_items WHERE cart_id = ? ORDER BY id")
-    .all(cartId) as CartItemRow[];
-
-  const lines: CartLine[] = [];
-  for (const row of rows) {
-    const product = getProductById(row.product_id);
-    if (product) {
-      lines.push({ productId: row.product_id, quantity: row.quantity, product });
-    }
-  }
-  return lines;
+  return rows.map((row) => ({
+    productId: row.productId,
+    quantity: row.quantity,
+    product: toProduct(row.product),
+  }));
 }
 
-export function addToCart(cartId: string, productId: number, quantity: number): void {
-  const existing = db
-    .prepare("SELECT id, quantity FROM cart_items WHERE cart_id = ? AND product_id = ?")
-    .get(cartId, productId) as { id: number; quantity: number } | undefined;
-
-  if (existing) {
-    db.prepare("UPDATE cart_items SET quantity = ? WHERE id = ?").run(
-      existing.quantity + quantity,
-      existing.id
-    );
-  } else {
-    db.prepare(
-      "INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)"
-    ).run(cartId, productId, quantity);
-  }
+export async function addToCart(cartId: string, productId: number, quantity: number): Promise<void> {
+  await prisma.cartItem.upsert({
+    where: { cartId_productId: { cartId, productId } },
+    create: { cartId, productId, quantity },
+    update: { quantity: { increment: quantity } },
+  });
 }
 
-export function setCartItemQuantity(cartId: string, productId: number, quantity: number): void {
+export async function setCartItemQuantity(
+  cartId: string,
+  productId: number,
+  quantity: number
+): Promise<void> {
   if (quantity <= 0) {
-    removeFromCart(cartId, productId);
+    await removeFromCart(cartId, productId);
     return;
   }
 
-  const existing = db
-    .prepare("SELECT id FROM cart_items WHERE cart_id = ? AND product_id = ?")
-    .get(cartId, productId) as { id: number } | undefined;
-
-  if (existing) {
-    db.prepare("UPDATE cart_items SET quantity = ? WHERE id = ?").run(quantity, existing.id);
-  } else {
-    db.prepare(
-      "INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)"
-    ).run(cartId, productId, quantity);
-  }
+  await prisma.cartItem.upsert({
+    where: { cartId_productId: { cartId, productId } },
+    create: { cartId, productId, quantity },
+    update: { quantity },
+  });
 }
 
-export function removeFromCart(cartId: string, productId: number): void {
-  db.prepare("DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?").run(cartId, productId);
+export async function removeFromCart(cartId: string, productId: number): Promise<void> {
+  await prisma.cartItem.deleteMany({ where: { cartId, productId } });
 }
 
-export function clearCart(cartId: string): void {
-  db.prepare("DELETE FROM cart_items WHERE cart_id = ?").run(cartId);
+export async function clearCart(cartId: string): Promise<void> {
+  await prisma.cartItem.deleteMany({ where: { cartId } });
 }

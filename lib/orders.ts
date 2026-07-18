@@ -1,16 +1,5 @@
-import { db } from "./db";
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    razorpay_order_id TEXT NOT NULL,
-    razorpay_payment_id TEXT NOT NULL UNIQUE,
-    total INTEGER NOT NULL,
-    items_json TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`);
+import { prisma } from "./prisma";
+import type { Prisma } from "./generated/prisma/client";
 
 export type OrderLineItem = {
   id: number;
@@ -32,25 +21,23 @@ export type Order = {
   createdAt: string;
 };
 
-type OrderRow = {
+function toOrder(row: {
   id: number;
-  user_id: number | null;
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
+  userId: number | null;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
   total: number;
-  items_json: string;
-  created_at: string;
-};
-
-function rowToOrder(row: OrderRow): Order {
+  items: Prisma.JsonValue;
+  createdAt: Date;
+}): Order {
   return {
     id: row.id,
-    userId: row.user_id,
-    razorpayOrderId: row.razorpay_order_id,
-    razorpayPaymentId: row.razorpay_payment_id,
+    userId: row.userId,
+    razorpayOrderId: row.razorpayOrderId,
+    razorpayPaymentId: row.razorpayPaymentId,
     total: row.total,
-    items: JSON.parse(row.items_json),
-    createdAt: row.created_at,
+    items: row.items as unknown as OrderLineItem[],
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -62,31 +49,28 @@ export type CreateOrderInput = {
   items: OrderLineItem[];
 };
 
-export function createOrder(input: CreateOrderInput): Order {
-  const result = db
-    .prepare(
-      `INSERT INTO orders (user_id, razorpay_order_id, razorpay_payment_id, total, items_json)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .run(
-      input.userId,
-      input.razorpayOrderId,
-      input.razorpayPaymentId,
-      input.total,
-      JSON.stringify(input.items)
-    );
-
-  return getOrderById(Number(result.lastInsertRowid))!;
+export async function createOrder(input: CreateOrderInput): Promise<Order> {
+  const row = await prisma.order.create({
+    data: {
+      userId: input.userId,
+      razorpayOrderId: input.razorpayOrderId,
+      razorpayPaymentId: input.razorpayPaymentId,
+      total: input.total,
+      items: input.items as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return toOrder(row);
 }
 
-export function getOrderById(id: number): Order | undefined {
-  const row = db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as OrderRow | undefined;
-  return row ? rowToOrder(row) : undefined;
+export async function getOrderById(id: number): Promise<Order | undefined> {
+  const row = await prisma.order.findUnique({ where: { id } });
+  return row ? toOrder(row) : undefined;
 }
 
-export function getOrdersForUser(userId: number): Order[] {
-  const rows = db
-    .prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC")
-    .all(userId) as OrderRow[];
-  return rows.map(rowToOrder);
+export async function getOrdersForUser(userId: number): Promise<Order[]> {
+  const rows = await prisma.order.findMany({
+    where: { userId },
+    orderBy: { id: "desc" },
+  });
+  return rows.map(toOrder);
 }

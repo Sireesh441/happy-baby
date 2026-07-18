@@ -14,7 +14,7 @@ async function saveUploadedImage(file: File): Promise<string> {
 }
 
 export async function GET() {
-  return NextResponse.json(getAllProducts());
+  return NextResponse.json(await getAllProducts());
 }
 
 export async function POST(request: Request) {
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   const hasDiscount = discountPrice !== null && Number.isFinite(discountPrice) && discountPrice > 0 && discountPrice < price;
 
-  const product = createProduct({
+  const product = await createProduct({
     name,
     description,
     price: hasDiscount ? discountPrice! : price,

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No message provided." }, { status: 400 });
   }
 
-  const products = getAllProducts();
+  const products = await getAllProducts();
   const catalogLines = products
     .map((p) => `- ${p.name} | ${p.category} | ₹${p.price} | ${p.description}`)
     .join("\n");

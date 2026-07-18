@@ -15,7 +15,7 @@ async function saveUploadedImage(file: File): Promise<string> {
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const product = getProductById(Number(id));
+  const product = await getProductById(Number(id));
 
   if (!product) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
@@ -30,7 +30,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const existing = getProductById(Number(id));
+  const existing = await getProductById(Number(id));
   if (!existing) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
@@ -68,7 +68,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const hasDiscount = discountPrice !== null && Number.isFinite(discountPrice) && discountPrice > 0 && discountPrice < price;
 
-  const product = updateProduct(existing.id, {
+  const product = await updateProduct(existing.id, {
     name,
     description,
     price: hasDiscount ? discountPrice! : price,
@@ -89,11 +89,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const existing = getProductById(Number(id));
+  const existing = await getProductById(Number(id));
   if (!existing) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
-  deleteProduct(existing.id);
+  await deleteProduct(existing.id);
   return NextResponse.json({ success: true });
 }
