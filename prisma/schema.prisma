@@ -7,6 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Vertical {
+  kids
+  men
+  women
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   name         String
@@ -31,6 +37,7 @@ model Product {
   color         String
   image         String?
   stock         Int      @default(0)
+  vertical      Vertical @default(kids)
   createdAt     DateTime @default(now()) @map("created_at")
 
   cartItems CartItem[]

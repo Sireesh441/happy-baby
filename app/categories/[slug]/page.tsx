@@ -22,7 +22,10 @@ export default async function CategoryPage({
     notFound();
   }
 
-  const response = await fetch(`${getBaseUrl()}/api/products`, { cache: "no-store" });
+  const response = await fetch(
+    `${getBaseUrl()}/api/products?vertical=${category.vertical}`,
+    { cache: "no-store" }
+  );
   const allProducts: Product[] = await response.json();
   const products = allProducts.filter((product) => product.category === category.name);
 
@@ -35,7 +38,7 @@ export default async function CategoryPage({
             <span aria-hidden="true">{category.emoji}</span> {category.name}
           </h1>
           <p className="mx-auto mb-10 max-w-xl text-center text-slate-600">
-            Shop our {category.name.toLowerCase()} essentials for your little one.
+            Shop our {category.name.toLowerCase()} essentials.
           </p>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {products.map((product) => (

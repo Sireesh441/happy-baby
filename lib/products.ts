@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import type { Category, Product, Tag } from "../app/data/products";
+import type { Category, Product, Tag, Vertical } from "../app/data/products";
 
 export function toProduct(row: {
   id: number;
@@ -11,6 +11,7 @@ export function toProduct(row: {
   reviewCount: number;
   tag: string | null;
   category: string;
+  vertical: string;
   emoji: string;
   color: string;
   image: string | null;
@@ -26,6 +27,7 @@ export function toProduct(row: {
     reviewCount: row.reviewCount,
     tag: (row.tag as Tag | null) ?? undefined,
     category: row.category as Category,
+    vertical: row.vertical as Vertical,
     emoji: row.emoji,
     color: row.color,
     image: row.image ?? undefined,
@@ -33,8 +35,11 @@ export function toProduct(row: {
   };
 }
 
-export async function getAllProducts(): Promise<Product[]> {
-  const rows = await prisma.product.findMany({ orderBy: { id: "asc" } });
+export async function getAllProducts(vertical?: Vertical): Promise<Product[]> {
+  const rows = await prisma.product.findMany({
+    where: vertical ? { vertical } : undefined,
+    orderBy: { id: "asc" },
+  });
   return rows.map(toProduct);
 }
 
@@ -43,9 +48,12 @@ export async function getProductById(id: number): Promise<Product | undefined> {
   return row ? toProduct(row) : undefined;
 }
 
-export async function getProductsByCategory(category: Category): Promise<Product[]> {
+export async function getProductsByCategory(
+  category: Category,
+  vertical: Vertical
+): Promise<Product[]> {
   const rows = await prisma.product.findMany({
-    where: { category },
+    where: { category, vertical },
     orderBy: { id: "asc" },
   });
   return rows.map(toProduct);
@@ -57,6 +65,7 @@ export type ProductInput = {
   price: number;
   originalPrice?: number;
   category: Category;
+  vertical: Vertical;
   emoji: string;
   color: string;
   image?: string;
@@ -71,6 +80,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       price: input.price,
       originalPrice: input.originalPrice ?? null,
       category: input.category,
+      vertical: input.vertical,
       emoji: input.emoji,
       color: input.color,
       image: input.image ?? null,
@@ -89,6 +99,7 @@ export async function updateProduct(id: number, input: ProductInput): Promise<Pr
       price: input.price,
       originalPrice: input.originalPrice ?? null,
       category: input.category,
+      vertical: input.vertical,
       emoji: input.emoji,
       color: input.color,
       image: input.image ?? null,

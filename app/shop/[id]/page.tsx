@@ -23,7 +23,10 @@ export default async function ProductDetailPage({
 
   const product: Product = await productResponse.json();
 
-  const allProductsResponse = await fetch(`${baseUrl}/api/products`, { cache: "no-store" });
+  const allProductsResponse = await fetch(
+    `${baseUrl}/api/products?vertical=${product.vertical}`,
+    { cache: "no-store" }
+  );
   const allProducts: Product[] = await allProductsResponse.json();
   const relatedProducts = allProducts
     .filter((item) => item.category === product.category && item.id !== product.id)

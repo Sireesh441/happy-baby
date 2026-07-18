@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useCart } from "../context/CartContext";
 import { isAdminEmail } from "../../lib/admin";
+import type { Vertical } from "../data/products";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
@@ -12,19 +13,27 @@ const NAV_LINKS = [
   { label: "Categories", href: "/categories" },
 ];
 
-export default function Header() {
+const BRAND: Record<Vertical, { name: string; emoji: string; accent: string }> = {
+  kids: { name: "Happy Baby", emoji: "🍼", accent: "text-pink-500" },
+  men: { name: "Happy Men", emoji: "👔", accent: "text-sky-600" },
+  women: { name: "Happy Women", emoji: "👗", accent: "text-violet-600" },
+};
+
+export default function Header({ vertical = "kids" }: { vertical?: Vertical }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
   const { data: session, status } = useSession();
+  const brand = BRAND[vertical];
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2 text-2xl font-extrabold text-pink-500">
-          <span aria-hidden="true">🍼</span>
-          <span>
-            Happy<span className="text-sky-500">Baby</span>
-          </span>
+        <Link
+          href={`/${vertical}`}
+          className={`flex items-center gap-2 text-2xl font-extrabold ${brand.accent}`}
+        >
+          <span aria-hidden="true">{brand.emoji}</span>
+          <span>{brand.name}</span>
         </Link>
 
         <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-600 md:flex">

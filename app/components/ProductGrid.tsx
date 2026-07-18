@@ -1,15 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES, type Category, type Product } from "../data/products";
+import type { Product } from "../data/products";
 import ProductCard from "./ProductCard";
 
-type Filter = "All" | Category;
-
-const FILTERS: Filter[] = ["All", ...CATEGORIES];
-
 export default function ProductGrid({ products }: { products: Product[] }) {
-  const [activeFilter, setActiveFilter] = useState<Filter>("All");
+  const [activeFilter, setActiveFilter] = useState<string>("All");
+
+  const categories = Array.from(new Set(products.map((product) => product.category)));
+  const filters = ["All", ...categories];
 
   const filteredProducts =
     activeFilter === "All"
@@ -19,7 +18,7 @@ export default function ProductGrid({ products }: { products: Product[] }) {
   return (
     <div>
       <div className="mb-10 flex flex-wrap justify-center gap-3">
-        {FILTERS.map((filter) => (
+        {filters.map((filter) => (
           <button
             key={filter}
             type="button"

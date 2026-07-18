@@ -3,7 +3,7 @@ import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { requireAdminSession } from "../../../../lib/apiAuth";
 import { deleteProduct, getProductById, updateProduct } from "../../../../lib/products";
-import { CATEGORY_META, type Category } from "../../../../app/data/products";
+import { getCategoryMeta, type Vertical } from "../../../../app/data/products";
 
 async function saveUploadedImage(file: File): Promise<string> {
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -39,7 +39,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const category = String(formData.get("category") ?? "") as Category;
+  const category = String(formData.get("category") ?? "");
+  const vertical = String(formData.get("vertical") ?? "") as Vertical;
   const price = Number(formData.get("price"));
   const discountPriceRaw = formData.get("discountPrice");
   const discountPrice = discountPriceRaw ? Number(discountPriceRaw) : null;
@@ -47,7 +48,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const emoji = String(formData.get("emoji") ?? "").trim();
   const imageFile = formData.get("image");
 
-  const categoryMeta = CATEGORY_META.find((c) => c.name === category);
+  const categoryMeta = getCategoryMeta(category, vertical);
 
   if (
     !name ||
@@ -74,6 +75,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     price: hasDiscount ? discountPrice! : price,
     originalPrice: hasDiscount ? price : undefined,
     category: categoryMeta.name,
+    vertical: categoryMeta.vertical,
     emoji: emoji || categoryMeta.emoji,
     color: categoryMeta.color,
     image,

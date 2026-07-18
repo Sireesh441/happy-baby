@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { CATEGORY_META } from "../data/products";
+import { CATEGORY_META, type Vertical } from "../data/products";
 
-export default function CategoryTiles() {
+export default function CategoryTiles({ vertical = "kids" }: { vertical?: Vertical }) {
+  const categories = CATEGORY_META.filter((category) => category.vertical === vertical);
+
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <section id="categories" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <h2 className="mb-8 text-center text-3xl font-bold text-slate-800">
         Shop by Category
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
-        {CATEGORY_META.map((category) => (
+        {categories.map((category) => (
           <Link
             key={category.slug}
             href={`/categories/${category.slug}`}

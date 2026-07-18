@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Product } from "../../data/products";
-import { CATEGORY_META } from "../../data/products";
+import type { Product, Vertical } from "../../data/products";
+import { VERTICALS, getCategoriesForVertical } from "../../data/products";
 
 type FormMode = { type: "closed" } | { type: "add" } | { type: "edit"; product: Product };
 
 type FormState = {
   name: string;
+  vertical: Vertical;
   category: string;
   price: string;
   discountPrice: string;
@@ -17,20 +18,25 @@ type FormState = {
   stock: string;
 };
 
-const EMPTY_FORM: FormState = {
-  name: "",
-  category: CATEGORY_META[0].name,
-  price: "",
-  discountPrice: "",
-  description: "",
-  emoji: "",
-  stock: "",
-};
+function emptyForm(): FormState {
+  const defaultVertical: Vertical = "kids";
+  return {
+    name: "",
+    vertical: defaultVertical,
+    category: getCategoriesForVertical(defaultVertical)[0].name,
+    price: "",
+    discountPrice: "",
+    description: "",
+    emoji: "",
+    stock: "",
+  };
+}
 
 function productToForm(product: Product): FormState {
   const hasDiscount = product.originalPrice !== undefined;
   return {
     name: product.name,
+    vertical: product.vertical,
     category: product.category,
     price: String(hasDiscount ? product.originalPrice : product.price),
     discountPrice: hasDiscount ? String(product.price) : "",
@@ -53,14 +59,16 @@ function stockStatus(stock: number) {
 export default function AdminPanel({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [formMode, setFormMode] = useState<FormMode>({ type: "closed" });
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  const categoryOptions = getCategoriesForVertical(form.vertical);
+
   function openAddForm() {
-    setForm(EMPTY_FORM);
+    setForm(emptyForm());
     setImageFile(null);
     setError(null);
     setFormMode({ type: "add" });
@@ -75,6 +83,14 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
 
   function closeForm() {
     setFormMode({ type: "closed" });
+  }
+
+  function handleVerticalChange(vertical: Vertical) {
+    setForm((f) => ({
+      ...f,
+      vertical,
+      category: getCategoriesForVertical(vertical)[0].name,
+    }));
   }
 
   async function handleDelete(product: Product) {
@@ -106,6 +122,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
     const body = new FormData();
     body.set("name", form.name.trim());
     body.set("description", form.description.trim());
+    body.set("vertical", form.vertical);
     body.set("category", form.category);
     body.set("price", form.price);
     body.set("discountPrice", form.discountPrice);
@@ -170,13 +187,28 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
             </div>
 
             <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">Vertical</label>
+              <select
+                value={form.vertical}
+                onChange={(e) => handleVerticalChange(e.target.value as Vertical)}
+                className="w-full rounded-full border-2 border-pink-200 px-4 py-2 text-sm text-slate-800 outline-none focus:border-pink-400"
+              >
+                {VERTICALS.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="mb-1 block text-sm font-semibold text-slate-700">Category</label>
               <select
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                 className="w-full rounded-full border-2 border-pink-200 px-4 py-2 text-sm text-slate-800 outline-none focus:border-pink-400"
               >
-                {CATEGORY_META.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c.slug} value={c.name}>
                     {c.name}
                   </option>
@@ -286,6 +318,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
           <thead>
             <tr className="border-b border-slate-100 text-slate-500">
               <th className="px-4 py-3 font-semibold">Product</th>
+              <th className="px-4 py-3 font-semibold">Vertical</th>
               <th className="px-4 py-3 font-semibold">Category</th>
               <th className="px-4 py-3 font-semibold">Price</th>
               <th className="px-4 py-3 font-semibold">Stock</th>
@@ -324,6 +357,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
                       </span>
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-slate-600 capitalize">{product.vertical}</td>
                   <td className="px-4 py-3 text-slate-600">{product.category}</td>
                   <td className="px-4 py-3">
                     <span className="font-semibold text-pink-500">
