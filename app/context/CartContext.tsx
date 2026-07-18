@@ -1,83 +1,117 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { Product } from "../data/products";
 
-export type CartLineItem = {
-  id: number;
+export type CartLine = {
+  productId: number;
   quantity: number;
+  product: Product;
 };
 
-type CartContextValue = {
-  items: CartLineItem[];
+type CartSummary = {
+  lines: CartLine[];
   itemCount: number;
-  addItem: (id: number, quantity?: number) => void;
-  removeItem: (id: number) => void;
-  updateQuantity: (id: number, quantity: number) => void;
+  subtotal: number;
+};
+
+type CartContextValue = CartSummary & {
+  loading: boolean;
+  addItem: (product: Product, quantity?: number) => void;
+  removeItem: (productId: number) => void;
+  updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
 };
 
+const EMPTY_SUMMARY: CartSummary = { lines: [], itemCount: 0, subtotal: 0 };
+
 const CartContext = createContext<CartContextValue | null>(null);
 
-const STORAGE_KEY = "happybaby-cart";
-
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartLineItem[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [summary, setSummary] = useState<CartSummary>(EMPTY_SUMMARY);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setItems(JSON.parse(stored));
-      }
-    } catch {
-      // ignore corrupt storage
-    }
-    setHydrated(true);
+    fetch("/api/cart")
+      .then((response) => response.json())
+      .then((data: CartSummary) => setSummary(data))
+      .catch(() => setSummary(EMPTY_SUMMARY))
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items, hydrated]);
-
-  function addItem(id: number, quantity = 1) {
-    setItems((current) => {
-      const existing = current.find((item) => item.id === id);
-      if (existing) {
-        return current.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + quantity } : item
-        );
-      }
-      return [...current, { id, quantity }];
+  function addItem(product: Product, quantity = 1) {
+    setSummary((current) => {
+      const existing = current.lines.find((line) => line.productId === product.id);
+      const lines = existing
+        ? current.lines.map((line) =>
+            line.productId === product.id
+              ? { ...line, quantity: line.quantity + quantity }
+              : line
+          )
+        : [...current.lines, { productId: product.id, quantity, product }];
+      return recompute(lines);
     });
+
+    fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId: product.id, quantity }),
+    })
+      .then((response) => response.json())
+      .then((data: CartSummary) => setSummary(data))
+      .catch(() => {});
   }
 
-  function removeItem(id: number) {
-    setItems((current) => current.filter((item) => item.id !== id));
+  function removeItem(productId: number) {
+    setSummary((current) => recompute(current.lines.filter((line) => line.productId !== productId)));
+
+    fetch(`/api/cart/${productId}`, { method: "DELETE" })
+      .then((response) => response.json())
+      .then((data: CartSummary) => setSummary(data))
+      .catch(() => {});
   }
 
-  function updateQuantity(id: number, quantity: number) {
-    setItems((current) =>
-      quantity <= 0
-        ? current.filter((item) => item.id !== id)
-        : current.map((item) => (item.id === id ? { ...item, quantity } : item))
+  function updateQuantity(productId: number, quantity: number) {
+    setSummary((current) =>
+      recompute(
+        quantity <= 0
+          ? current.lines.filter((line) => line.productId !== productId)
+          : current.lines.map((line) =>
+              line.productId === productId ? { ...line, quantity } : line
+            )
+      )
     );
+
+    fetch(`/api/cart/${productId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity }),
+    })
+      .then((response) => response.json())
+      .then((data: CartSummary) => setSummary(data))
+      .catch(() => {});
   }
 
   function clearCart() {
-    setItems([]);
+    setSummary(EMPTY_SUMMARY);
+    fetch("/api/cart", { method: "DELETE" }).catch(() => {});
   }
-
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <CartContext.Provider
-      value={{ items, itemCount, addItem, removeItem, updateQuantity, clearCart }}
+      value={{ ...summary, loading, addItem, removeItem, updateQuantity, clearCart }}
     >
       {children}
     </CartContext.Provider>
   );
+}
+
+function recompute(lines: CartLine[]): CartSummary {
+  return {
+    lines,
+    itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
+    subtotal: lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
+  };
 }
 
 export function useCart() {

@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
-import { authOptions } from "../../../../../lib/auth";
-import { isAdminEmail } from "../../../../../lib/admin";
-import { deleteProduct, getProductById, updateProduct } from "../../../../../lib/products";
-import { CATEGORY_META, type Category } from "../../../../../app/data/products";
-
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  return isAdminEmail(session?.user?.email) ? session : null;
-}
+import { requireAdminSession } from "../../../../lib/apiAuth";
+import { deleteProduct, getProductById, updateProduct } from "../../../../lib/products";
+import { CATEGORY_META, type Category } from "../../../../app/data/products";
 
 async function saveUploadedImage(file: File): Promise<string> {
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -20,8 +13,19 @@ async function saveUploadedImage(file: File): Promise<string> {
   return `/products/${filename}`;
 }
 
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const product = getProductById(Number(id));
+
+  if (!product) {
+    return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  }
+
+  return NextResponse.json(product);
+}
+
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await requireAdmin())) {
+  if (!(await requireAdminSession())) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
@@ -80,7 +84,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await requireAdmin())) {
+  if (!(await requireAdminSession())) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 

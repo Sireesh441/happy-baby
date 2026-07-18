@@ -1,10 +1,12 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductGrid from "../components/ProductGrid";
-import { getAllProducts } from "../../lib/products";
+import type { Product } from "../data/products";
+import { getBaseUrl } from "../../lib/serverFetch";
 
 export default async function ShopPage() {
-  const products = getAllProducts();
+  const response = await fetch(`${getBaseUrl()}/api/products`, { cache: "no-store" });
+  const products: Product[] = await response.json();
 
   return (
     <>

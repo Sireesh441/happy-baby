@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Script from "next/script";
@@ -9,33 +9,14 @@ import { useSession } from "next-auth/react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useCart } from "../context/CartContext";
-import type { Product } from "../data/products";
-import { saveLastOrder } from "../lib/orderStorage";
 import type { RazorpayPaymentResponse } from "../../types/razorpay";
 
 export default function CartPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { items, itemCount, updateQuantity, removeItem, clearCart } = useCart();
-  const [products, setProducts] = useState<Product[]>([]);
+  const { lines, itemCount, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/products")
-      .then((response) => response.json())
-      .then(setProducts)
-      .catch(() => setProducts([]));
-  }, []);
-
-  const lines = items
-    .map((item) => {
-      const product = products.find((p) => p.id === item.id);
-      return product ? { product, quantity: item.quantity } : null;
-    })
-    .filter((line): line is { product: Product; quantity: number } => line !== null);
-
-  const subtotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
 
   async function handleCheckout() {
     setCheckoutError(null);
@@ -53,17 +34,17 @@ export default function CartPage() {
         throw new Error(data.error ?? "Could not start checkout.");
       }
 
-      const order = await orderResponse.json();
+      const razorpayOrder = await orderResponse.json();
 
       if (typeof window.Razorpay !== "function") {
         throw new Error("Payment gateway failed to load. Please try again.");
       }
 
       const checkout = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        order_id: order.orderId,
+        key: razorpayOrder.keyId,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        order_id: razorpayOrder.orderId,
         name: "HappyBaby",
         description: `Order for ${itemCount} item${itemCount > 1 ? "s" : ""}`,
         prefill: {
@@ -72,36 +53,21 @@ export default function CartPage() {
         },
         theme: { color: "#ec4899" },
         handler: async (response: RazorpayPaymentResponse) => {
-          const verifyResponse = await fetch("/api/razorpay/verify", {
+          const orderResult = await fetch("/api/orders", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(response),
           });
 
-          if (!verifyResponse.ok) {
+          if (!orderResult.ok) {
             setCheckoutError("Payment verification failed. Please contact support.");
             setPlacingOrder(false);
             return;
           }
 
-          saveLastOrder({
-            orderId: response.razorpay_order_id,
-            paymentId: response.razorpay_payment_id,
-            items: lines.map(({ product, quantity }) => ({
-              id: product.id,
-              name: product.name,
-              quantity,
-              price: product.price,
-              image: product.image,
-              emoji: product.emoji,
-              color: product.color,
-            })),
-            total: subtotal,
-            createdAt: new Date().toISOString(),
-          });
-
+          const order = await orderResult.json();
           clearCart();
-          router.push("/order-confirmation");
+          router.push(`/order-confirmation?orderId=${order.id}&paymentId=${order.razorpayPaymentId}`);
         },
         modal: {
           ondismiss: () => setPlacingOrder(false),

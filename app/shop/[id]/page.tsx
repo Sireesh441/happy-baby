@@ -4,11 +4,8 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
 import AddToCartControls from "../../components/AddToCartControls";
-import { getAllProducts, getProductById, getProductsByCategory } from "../../../lib/products";
-
-export function generateStaticParams() {
-  return getAllProducts().map((product) => ({ id: String(product.id) }));
-}
+import type { Product } from "../../data/products";
+import { getBaseUrl } from "../../../lib/serverFetch";
 
 export default async function ProductDetailPage({
   params,
@@ -16,21 +13,27 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = getProductById(Number(id));
+  const baseUrl = getBaseUrl();
 
-  if (!product) {
+  const productResponse = await fetch(`${baseUrl}/api/products/${id}`, { cache: "no-store" });
+
+  if (productResponse.status === 404) {
     notFound();
   }
+
+  const product: Product = await productResponse.json();
+
+  const allProductsResponse = await fetch(`${baseUrl}/api/products`, { cache: "no-store" });
+  const allProducts: Product[] = await allProductsResponse.json();
+  const relatedProducts = allProducts
+    .filter((item) => item.category === product.category && item.id !== product.id)
+    .slice(0, 4);
 
   const discountPercent = product.originalPrice
     ? Math.round(100 - (product.price / product.originalPrice) * 100)
     : null;
 
   const filledStars = Math.round(product.rating);
-
-  const relatedProducts = getProductsByCategory(product.category)
-    .filter((item) => item.id !== product.id)
-    .slice(0, 4);
 
   return (
     <>
@@ -101,7 +104,7 @@ export default async function ProductDetailPage({
               <p className="mt-4 text-slate-600">{product.description}</p>
 
               <div className="mt-8">
-                <AddToCartControls productId={product.id} />
+                <AddToCartControls product={product} />
               </div>
             </div>
           </div>

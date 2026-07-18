@@ -82,7 +82,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
       return;
     }
     setDeletingId(product.id);
-    const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+    const response = await fetch(`/api/products/${product.id}`, { method: "DELETE" });
     setDeletingId(null);
     if (response.ok) {
       setProducts((current) => current.filter((p) => p.id !== product.id));
@@ -116,7 +116,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
     }
 
     const isEdit = formMode.type === "edit";
-    const url = isEdit ? `/api/admin/products/${formMode.product.id}` : "/api/admin/products";
+    const url = isEdit ? `/api/products/${formMode.product.id}` : "/api/products";
     const method = isEdit ? "PUT" : "POST";
 
     const response = await fetch(url, { method, body });

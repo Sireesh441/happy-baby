@@ -3,7 +3,8 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
 import { CATEGORY_META, getCategoryBySlug } from "../../data/products";
-import { getProductsByCategory } from "../../../lib/products";
+import type { Product } from "../../data/products";
+import { getBaseUrl } from "../../../lib/serverFetch";
 
 export function generateStaticParams() {
   return CATEGORY_META.map((category) => ({ slug: category.slug }));
@@ -21,7 +22,9 @@ export default async function CategoryPage({
     notFound();
   }
 
-  const products = getProductsByCategory(category.name);
+  const response = await fetch(`${getBaseUrl()}/api/products`, { cache: "no-store" });
+  const allProducts: Product[] = await response.json();
+  const products = allProducts.filter((product) => product.category === category.name);
 
   return (
     <>

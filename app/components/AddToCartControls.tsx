@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useCart } from "../context/CartContext";
+import type { Product } from "../data/products";
 
-export default function AddToCartControls({ productId }: { productId: number }) {
+export default function AddToCartControls({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
 
   function handleAddToCart() {
-    addItem(productId, quantity);
+    addItem(product, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }
