@@ -1,8 +1,8 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ProductGrid from "../components/ProductGrid";
-import type { Product, Vertical } from "../data/products";
-import { getBaseUrl } from "../../lib/serverFetch";
+import type { Vertical } from "../data/products";
+import { getAllProducts } from "../../lib/products";
 
 const SHOP_HEADING: Record<Vertical, string> = {
   kids: "Shop All Products",
@@ -28,10 +28,7 @@ export default async function ShopPage({
   const { vertical: verticalParam } = await searchParams;
   const vertical: Vertical = isVertical(verticalParam) ? verticalParam : "kids";
 
-  const response = await fetch(`${getBaseUrl()}/api/products?vertical=${vertical}`, {
-    cache: "no-store",
-  });
-  const products: Product[] = await response.json();
+  const products = await getAllProducts(vertical);
 
   return (
     <>

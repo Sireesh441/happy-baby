@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import { authOptions } from "../../lib/auth";
 import { isAdminEmail } from "../../lib/admin";
-import { getBaseUrl } from "../../lib/serverFetch";
-import type { Product } from "../data/products";
+import { getAllProducts } from "../../lib/products";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AdminPanel from "../components/admin/AdminPanel";
@@ -19,8 +18,7 @@ export default async function AdminPage() {
     redirect("/");
   }
 
-  const response = await fetch(`${getBaseUrl()}/api/products`, { cache: "no-store" });
-  const products: Product[] = await response.json();
+  const products = await getAllProducts();
 
   return (
     <>

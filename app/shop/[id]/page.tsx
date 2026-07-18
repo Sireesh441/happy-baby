@@ -4,8 +4,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
 import AddToCartControls from "../../components/AddToCartControls";
-import type { Product } from "../../data/products";
-import { getBaseUrl } from "../../../lib/serverFetch";
+import { getAllProducts, getProductById } from "../../../lib/products";
 
 export default async function ProductDetailPage({
   params,
@@ -13,21 +12,14 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const baseUrl = getBaseUrl();
 
-  const productResponse = await fetch(`${baseUrl}/api/products/${id}`, { cache: "no-store" });
+  const product = await getProductById(Number(id));
 
-  if (productResponse.status === 404) {
+  if (!product) {
     notFound();
   }
 
-  const product: Product = await productResponse.json();
-
-  const allProductsResponse = await fetch(
-    `${baseUrl}/api/products?vertical=${product.vertical}`,
-    { cache: "no-store" }
-  );
-  const allProducts: Product[] = await allProductsResponse.json();
+  const allProducts = await getAllProducts(product.vertical);
   const relatedProducts = allProducts
     .filter((item) => item.category === product.category && item.id !== product.id)
     .slice(0, 4);
