@@ -29,7 +29,7 @@ const VERTICALS = [
 export default function Home() {
   return (
     <>
-      <Header />
+      <Header vertical="shopping" />
       <main className="flex flex-1 flex-col items-center justify-center bg-slate-50 px-4 py-16 sm:px-6">
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl font-extrabold text-slate-800 sm:text-5xl">

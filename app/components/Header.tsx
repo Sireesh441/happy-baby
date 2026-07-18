@@ -13,23 +13,27 @@ const NAV_LINKS = [
   { label: "Categories", href: "/categories" },
 ];
 
-const BRAND: Record<Vertical, { name: string; emoji: string; accent: string }> = {
+type HeaderVertical = Vertical | "shopping";
+
+const BRAND: Record<HeaderVertical, { name: string; emoji: string; accent: string }> = {
   kids: { name: "Happy Baby", emoji: "🍼", accent: "text-pink-500" },
   men: { name: "Happy Men", emoji: "👔", accent: "text-sky-600" },
   women: { name: "Happy Women", emoji: "👗", accent: "text-violet-600" },
+  shopping: { name: "Happy Shopping", emoji: "🛍️", accent: "text-pink-500" },
 };
 
-export default function Header({ vertical = "kids" }: { vertical?: Vertical }) {
+export default function Header({ vertical = "kids" }: { vertical?: HeaderVertical }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
   const { data: session, status } = useSession();
   const brand = BRAND[vertical];
+  const logoHref = vertical === "shopping" ? "/" : `/${vertical}`;
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Link
-          href={`/${vertical}`}
+          href={logoHref}
           className={`flex items-center gap-2 text-2xl font-extrabold ${brand.accent}`}
         >
           <span aria-hidden="true">{brand.emoji}</span>
