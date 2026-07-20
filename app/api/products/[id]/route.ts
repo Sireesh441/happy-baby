@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { requireAdminSession } from "../../../../lib/apiAuth";
+import { corsPreflight, withCors } from "../../../../lib/cors";
 import { deleteProduct, getProductById, updateProduct } from "../../../../lib/products";
 import { getCategoryMeta, type Vertical } from "../../../../app/data/products";
 
@@ -18,10 +19,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const product = await getProductById(Number(id));
 
   if (!product) {
-    return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    return withCors(NextResponse.json({ error: "Product not found." }, { status: 404 }));
   }
 
-  return NextResponse.json(product);
+  return withCors(NextResponse.json(product));
+}
+
+export async function OPTIONS() {
+  return corsPreflight();
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

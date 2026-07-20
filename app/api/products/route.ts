@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { requireAdminSession } from "../../../lib/apiAuth";
+import { corsPreflight, withCors } from "../../../lib/cors";
 import { createProduct, getAllProducts } from "../../../lib/products";
 import { getCategoryMeta, type Vertical } from "../../../app/data/products";
 
@@ -16,7 +17,11 @@ async function saveUploadedImage(file: File): Promise<string> {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const verticalParam = url.searchParams.get("vertical") as Vertical | null;
-  return NextResponse.json(await getAllProducts(verticalParam ?? undefined));
+  return withCors(NextResponse.json(await getAllProducts(verticalParam ?? undefined)));
+}
+
+export async function OPTIONS() {
+  return corsPreflight();
 }
 
 export async function POST(request: Request) {
