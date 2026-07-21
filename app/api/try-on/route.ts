@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { fal, ApiError, ValidationError } from "@fal-ai/client";
+import { Client } from "@gradio/client";
 import { corsPreflight, withCors } from "../../../lib/cors";
 import { getBearerToken, verifyMobileToken } from "../../../lib/mobileJwt";
 import { getProductById } from "../../../lib/products";
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const HF_SPACE = "yisol/IDM-VTON";
 
-export const maxDuration = 60;
+// ZeroGPU cold starts plus diffusion inference can run long; Vercel plan tier
+// may cap this lower than requested regardless (60s on Hobby).
+export const maxDuration = 120;
 
-function toDataUri(buffer: Buffer, mimeType: string): string {
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-}
-
-async function garmentImageDataUri(productImage: string): Promise<string> {
+async function garmentImageBlob(productImage: string): Promise<Blob> {
   const filePath = path.join(process.cwd(), "public", productImage);
   const buffer = await readFile(filePath);
   const extension = path.extname(productImage).toLowerCase();
   const mimeType = extension === ".png" ? "image/png" : "image/jpeg";
-  return toDataUri(buffer, mimeType);
+  return new Blob([buffer], { type: mimeType });
 }
 
 function jsonResponse(body: unknown, init?: { status?: number }) {
@@ -37,7 +36,7 @@ export async function POST(request: Request) {
     return jsonResponse({ error: "You must be logged in to use virtual try-on." }, { status: 401 });
   }
 
-  if (!process.env.FAL_API_KEY) {
+  if (!process.env.HF_TOKEN) {
     return jsonResponse({ error: "Virtual try-on is not configured." }, { status: 500 });
   }
 
@@ -80,9 +79,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let garmentImage: string;
+  let garmentImage: Blob;
   try {
-    garmentImage = await garmentImageDataUri(product.image);
+    garmentImage = await garmentImageBlob(product.image);
   } catch {
     return jsonResponse(
       { error: "This product's image couldn't be loaded for virtual try-on." },
@@ -90,51 +89,41 @@ export async function POST(request: Request) {
     );
   }
 
-  const modelImage = toDataUri(Buffer.from(await photo.arrayBuffer()), photo.type);
+  const personImage = new Blob([await photo.arrayBuffer()], { type: photo.type });
 
   try {
-    fal.config({ credentials: process.env.FAL_API_KEY });
+    const client = await Client.connect(HF_SPACE, { token: process.env.HF_TOKEN as `hf_${string}` });
 
-    const result = await fal.subscribe("fal-ai/fashn/tryon/v1.5", {
-      input: {
-        model_image: modelImage,
-        garment_image: garmentImage,
-        category: "auto",
-      },
+    const result = await client.predict("/tryon", {
+      dict: { background: personImage, layers: [], composite: personImage },
+      garm_img: garmentImage,
+      garment_des: product.name,
+      is_checked: true,
+      is_checked_crop: true,
+      denoise_steps: 30,
+      seed: Math.floor(Math.random() * 1_000_000),
     });
 
-    const resultImage = result.data.images?.[0];
-    if (!resultImage?.url) {
+    const data = result.data as Array<{ url?: string; path?: string } | undefined>;
+    const resultImage = data?.[0];
+    const imageUrl = resultImage?.url ?? resultImage?.path;
+
+    if (!imageUrl) {
       return jsonResponse(
         { error: "Try-on generation didn't return an image. Please try a different photo." },
         { status: 502 }
       );
     }
 
-    return jsonResponse({ imageUrl: resultImage.url });
+    return jsonResponse({ imageUrl });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      const message = error.body?.detail?.[0]?.msg;
-      return jsonResponse(
-        {
-          error:
-            message ??
-            "We couldn't process that photo or garment. Make sure the photo clearly shows a face and body.",
-        },
-        { status: 422 }
-      );
-    }
-
-    if (error instanceof ApiError) {
-      return jsonResponse(
-        { error: "The virtual try-on service is temporarily unavailable. Please try again shortly." },
-        { status: 502 }
-      );
-    }
-
+    console.error("Virtual try-on generation failed:", error);
     return jsonResponse(
-      { error: "Something went wrong generating your try-on. Please try again." },
-      { status: 500 }
+      {
+        error:
+          "We couldn't process that photo. Make sure it clearly shows your face and body, and try again.",
+      },
+      { status: 502 }
     );
   }
 }
