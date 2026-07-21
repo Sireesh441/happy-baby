@@ -3,6 +3,26 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { getUserByEmail } from "./db";
 
+export type AuthenticatedUser = { id: string; name: string; email: string };
+
+/**
+ * Shared by NextAuth's Credentials provider (web, cookie session) and the
+ * mobile-auth endpoints (JWT) so both surfaces authenticate identically.
+ */
+export async function verifyCredentials(email: string, password: string): Promise<AuthenticatedUser | null> {
+  const user = await getUserByEmail(email);
+  if (!user) {
+    return null;
+  }
+
+  const passwordMatches = await bcrypt.compare(password, user.password_hash);
+  if (!passwordMatches) {
+    return null;
+  }
+
+  return { id: String(user.id), name: user.name, email: user.email };
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: {
@@ -20,17 +40,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await getUserByEmail(credentials.email);
-        if (!user) {
-          return null;
-        }
-
-        const passwordMatches = await bcrypt.compare(credentials.password, user.password_hash);
-        if (!passwordMatches) {
-          return null;
-        }
-
-        return { id: String(user.id), name: user.name, email: user.email };
+        return verifyCredentials(credentials.email, credentials.password);
       },
     }),
   ],

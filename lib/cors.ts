@@ -1,11 +1,13 @@
-// Applied to the public, read-only product-browsing endpoints so the mobile
-// app (and other clients) can fetch them cross-origin. Deliberately not
-// applied to authenticated/mutating routes (auth, cart, orders, admin writes) —
-// those rely on same-origin cookie sessions, which "*" can't carry anyway.
+// Applied to endpoints meant to be called cross-origin from the mobile app
+// (including its web build): public product-browsing, and mobile-auth, which
+// returns a bearer token instead of setting a cookie so "*" doesn't leak any
+// session. Deliberately not applied to NextAuth's cookie-session routes (web
+// login, cart, orders, admin writes) — those rely on same-origin cookies,
+// which "*" can't carry cross-origin anyway.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 export function withCors<T extends Response>(response: T): T {
