@@ -15,6 +15,10 @@ export type Category =
 
 export type Tag = "Bestseller" | "New" | "Sale";
 
+// Which part of the body a Clothing product covers — used to gate virtual
+// try-on, since the current model only supports upper-body garments.
+export type GarmentRegion = "upper_body" | "lower_body" | "dresses";
+
 export type Product = {
   id: number;
   name: string;
@@ -30,6 +34,7 @@ export type Product = {
   color: string;
   image?: string;
   stock: number;
+  garmentRegion?: GarmentRegion;
 };
 
 export type CategoryMeta = {

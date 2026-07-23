@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import type { Category, Product, Tag, Vertical } from "../app/data/products";
+import type { Category, GarmentRegion, Product, Tag, Vertical } from "../app/data/products";
 
 export function toProduct(row: {
   id: number;
@@ -16,6 +16,7 @@ export function toProduct(row: {
   color: string;
   image: string | null;
   stock: number;
+  garmentRegion: string | null;
 }): Product {
   return {
     id: row.id,
@@ -32,6 +33,7 @@ export function toProduct(row: {
     color: row.color,
     image: row.image ?? undefined,
     stock: row.stock,
+    garmentRegion: (row.garmentRegion as GarmentRegion | null) ?? undefined,
   };
 }
 
@@ -70,6 +72,7 @@ export type ProductInput = {
   color: string;
   image?: string;
   stock: number;
+  garmentRegion?: GarmentRegion;
 };
 
 export async function createProduct(input: ProductInput): Promise<Product> {
@@ -85,6 +88,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       color: input.color,
       image: input.image ?? null,
       stock: input.stock,
+      garmentRegion: input.garmentRegion ?? null,
     },
   });
   return toProduct(row);
@@ -104,6 +108,7 @@ export async function updateProduct(id: number, input: ProductInput): Promise<Pr
       color: input.color,
       image: input.image ?? null,
       stock: input.stock,
+      garmentRegion: input.garmentRegion ?? null,
     },
   });
   return toProduct(row);
