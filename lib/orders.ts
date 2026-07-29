@@ -11,6 +11,15 @@ export type OrderLineItem = {
   color: string;
 };
 
+export type ShippingAddress = {
+  name: string;
+  phone: string;
+  line1: string;
+  city: string;
+  state: string;
+  pincode: string;
+};
+
 export type Order = {
   id: number;
   userId: number | null;
@@ -18,6 +27,7 @@ export type Order = {
   razorpayPaymentId: string;
   total: number;
   items: OrderLineItem[];
+  shippingAddress: ShippingAddress;
   createdAt: string;
 };
 
@@ -28,6 +38,7 @@ function toOrder(row: {
   razorpayPaymentId: string;
   total: number;
   items: Prisma.JsonValue;
+  shippingAddress: Prisma.JsonValue;
   createdAt: Date;
 }): Order {
   return {
@@ -37,26 +48,31 @@ function toOrder(row: {
     razorpayPaymentId: row.razorpayPaymentId,
     total: row.total,
     items: row.items as unknown as OrderLineItem[],
+    shippingAddress: row.shippingAddress as unknown as ShippingAddress,
     createdAt: row.createdAt.toISOString(),
   };
 }
 
 export type CreateOrderInput = {
   userId: number | null;
+  addressId?: number | null;
   razorpayOrderId: string;
   razorpayPaymentId: string;
   total: number;
   items: OrderLineItem[];
+  shippingAddress: ShippingAddress;
 };
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const row = await prisma.order.create({
     data: {
       userId: input.userId,
+      addressId: input.addressId ?? null,
       razorpayOrderId: input.razorpayOrderId,
       razorpayPaymentId: input.razorpayPaymentId,
       total: input.total,
       items: input.items as unknown as Prisma.InputJsonValue,
+      shippingAddress: input.shippingAddress as unknown as Prisma.InputJsonValue,
     },
   });
   return toOrder(row);

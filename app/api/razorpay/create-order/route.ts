@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
+import { corsPreflight, withCors } from "../../../../lib/cors";
 import { razorpay } from "../../../../lib/razorpay";
+
+export async function OPTIONS() {
+  return corsPreflight();
+}
 
 export async function POST(request: Request) {
   const { amount } = await request.json();
 
   if (typeof amount !== "number" || amount <= 0) {
-    return NextResponse.json({ error: "Invalid order amount." }, { status: 400 });
+    return withCors(NextResponse.json({ error: "Invalid order amount." }, { status: 400 }));
   }
 
   try {
@@ -15,13 +20,15 @@ export async function POST(request: Request) {
       receipt: `order_rcpt_${Date.now()}`,
     });
 
-    return NextResponse.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
-    });
+    return withCors(
+      NextResponse.json({
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: process.env.RAZORPAY_KEY_ID,
+      })
+    );
   } catch {
-    return NextResponse.json({ error: "Failed to create Razorpay order." }, { status: 502 });
+    return withCors(NextResponse.json({ error: "Failed to create Razorpay order." }, { status: 502 }));
   }
 }

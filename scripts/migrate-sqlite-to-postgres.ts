@@ -118,6 +118,8 @@ async function main() {
           razorpayPaymentId: order.razorpay_payment_id,
           total: order.total,
           items: JSON.parse(order.items_json),
+          // Pre-dates the shipping-address feature; no source data to backfill from.
+          shippingAddress: { name: "", phone: "", line1: "", city: "", state: "", pincode: "" },
           createdAt: toIsoDate(order.created_at),
         },
       });

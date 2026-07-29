@@ -50,6 +50,11 @@ export async function getProductById(id: number): Promise<Product | undefined> {
   return row ? toProduct(row) : undefined;
 }
 
+export async function getProductsByIds(ids: number[]): Promise<Product[]> {
+  const rows = await prisma.product.findMany({ where: { id: { in: ids } } });
+  return rows.map(toProduct);
+}
+
 export async function getProductsByCategory(
   category: Category,
   vertical: Vertical

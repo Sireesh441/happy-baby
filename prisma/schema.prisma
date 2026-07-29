@@ -28,7 +28,28 @@ model User {
   passwordHash String   @map("password_hash")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  addresses Address[]
+  orders    Order[]
+
   @@map("users")
+}
+
+model Address {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  name      String
+  phone     String
+  line1     String
+  city      String
+  state     String
+  pincode   String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
 }
 
 model Product {
@@ -70,11 +91,16 @@ model CartItem {
 model Order {
   id                Int      @id @default(autoincrement())
   userId            Int?     @map("user_id")
+  addressId         Int?     @map("address_id")
   razorpayOrderId   String   @map("razorpay_order_id")
   razorpayPaymentId String   @unique @map("razorpay_payment_id")
   total             Int
   items             Json
+  shippingAddress   Json     @map("shipping_address")
   createdAt         DateTime @default(now()) @map("created_at")
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  address Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   @@map("orders")
 }
