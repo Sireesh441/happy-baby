@@ -2,17 +2,22 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAllProducts } from "../../../lib/products";
 import { CATEGORY_META } from "../../../app/data/products";
+import { corsPreflight, withCors } from "../../../lib/cors";
 
 const anthropic = new Anthropic();
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export async function OPTIONS() {
+  return corsPreflight();
+}
 
 export async function POST(request: Request) {
   const body = await request.json();
   const messages = body.messages;
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json({ error: "No message provided." }, { status: 400 });
+    return withCors(NextResponse.json({ error: "No message provided." }, { status: 400 }));
   }
 
   const products = await getAllProducts();
@@ -45,11 +50,13 @@ When a parent describes what they need, recommend 2-3 relevant products from the
         ? textBlock.text
         : "Sorry, I couldn't come up with a suggestion right now.";
 
-    return NextResponse.json({ reply });
+    return withCors(NextResponse.json({ reply }));
   } catch {
-    return NextResponse.json(
-      { error: "The assistant is unavailable right now. Please try again shortly." },
-      { status: 502 }
+    return withCors(
+      NextResponse.json(
+        { error: "The assistant is unavailable right now. Please try again shortly." },
+        { status: 502 }
+      )
     );
   }
 }
