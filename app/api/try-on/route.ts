@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { Client } from "@gradio/client";
 import { corsPreflight, withCors } from "../../../lib/cors";
 import { getBearerToken, verifyMobileToken } from "../../../lib/mobileJwt";
 import { getProductById } from "../../../lib/products";
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-const HF_SPACE = "yisol/IDM-VTON";
+const TRYON_SERVICE_URL = process.env.TRYON_SERVICE_URL ?? "http://localhost:4002";
 
-// ZeroGPU cold starts plus diffusion inference can run long; Vercel plan tier
-// may cap this lower than requested regardless (60s on Hobby).
+// tryon-service's own Hugging Face call chains through a Gradio Space;
+// ZeroGPU cold starts plus diffusion inference can run long. Vercel plan
+// tier may cap this lower than requested regardless (60s on Hobby).
 export const maxDuration = 120;
 
 async function garmentImageBlob(productImage: string): Promise<Blob> {
@@ -34,10 +34,6 @@ export async function POST(request: Request) {
   const user = token ? verifyMobileToken(token) : null;
   if (!user) {
     return jsonResponse({ error: "You must be logged in to use virtual try-on." }, { status: 401 });
-  }
-
-  if (!process.env.HF_TOKEN) {
-    return jsonResponse({ error: "Virtual try-on is not configured." }, { status: 500 });
   }
 
   const formData = await request.formData().catch(() => null);
@@ -91,38 +87,35 @@ export async function POST(request: Request) {
 
   const personImage = new Blob([await photo.arrayBuffer()], { type: photo.type });
 
-  try {
-    const client = await Client.connect(HF_SPACE, { token: process.env.HF_TOKEN as `hf_${string}` });
+  const tryOnForm = new FormData();
+  tryOnForm.append("personImage", personImage, "photo.jpg");
+  tryOnForm.append("garmentImage", garmentImage, product.image);
+  tryOnForm.append("garmentDescription", product.name);
 
-    const result = await client.predict("/tryon", {
-      dict: { background: personImage, layers: [], composite: personImage },
-      garm_img: garmentImage,
-      garment_des: product.name,
-      is_checked: true,
-      is_checked_crop: true,
-      denoise_steps: 30,
-      seed: Math.floor(Math.random() * 1_000_000),
+  try {
+    const response = await fetch(`${TRYON_SERVICE_URL}/api/try-on`, {
+      method: "POST",
+      body: tryOnForm,
     });
 
-    const data = result.data as Array<{ url?: string; path?: string } | undefined>;
-    const resultImage = data?.[0];
-    const imageUrl = resultImage?.url ?? resultImage?.path;
+    const data = await response.json().catch(() => ({}));
 
-    if (!imageUrl) {
+    if (!response.ok || typeof data.imageUrl !== "string") {
+      console.error("tryon-service request failed:", response.status, data);
       return jsonResponse(
-        { error: "Try-on generation didn't return an image. Please try a different photo." },
+        {
+          error:
+            "We couldn't process that photo. Make sure it clearly shows your face and body, and try again.",
+        },
         { status: 502 }
       );
     }
 
-    return jsonResponse({ imageUrl });
+    return jsonResponse({ imageUrl: data.imageUrl });
   } catch (error) {
     console.error("Virtual try-on generation failed:", error);
     return jsonResponse(
-      {
-        error:
-          "We couldn't process that photo. Make sure it clearly shows your face and body, and try again.",
-      },
+      { error: "Virtual try-on is temporarily unavailable. Please try again shortly." },
       { status: 502 }
     );
   }
