@@ -15,10 +15,12 @@ const TAG_STYLES: Record<Tag, string> = {
 export default function ProductCard({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
+  const outOfStock = product.inStock === false;
 
   function handleAddToCart(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
+    if (outOfStock) return;
     addItem(product, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
@@ -69,6 +71,11 @@ export default function ProductCard({ product }: { product: Product }) {
             -{discountPercent}%
           </span>
         )}
+        {outOfStock && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-bold text-white">
+            Out of Stock
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
@@ -106,9 +113,10 @@ export default function ProductCard({ product }: { product: Product }) {
         <button
           type="button"
           onClick={handleAddToCart}
-          className="mt-4 w-full rounded-full bg-pink-500 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600"
+          disabled={outOfStock}
+          className="mt-4 w-full rounded-full bg-pink-500 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pink-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300"
         >
-          {added ? "Added ✓" : "Add to Cart"}
+          {outOfStock ? "Out of Stock" : added ? "Added ✓" : "Add to Cart"}
         </button>
       </div>
     </Link>

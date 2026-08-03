@@ -37,7 +37,7 @@ export type Product = {
   image?: string;
   stock: number;
   // sizes/inStock are only meaningfully populated for products created or
-  // updated via the Excel catalog import (see lib/productImport.ts);
+  // updated via the Excel catalog import (see scripts/import-products.js);
   // manually added products don't have a per-size breakdown.
   sizes?: SizeEntry[];
   inStock?: boolean;
