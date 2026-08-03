@@ -19,6 +19,8 @@ export type Tag = "Bestseller" | "New" | "Sale";
 // try-on, since the current model only supports upper-body garments.
 export type GarmentRegion = "upper_body" | "lower_body" | "dresses";
 
+export type SizeEntry = { size: string; quantity: number; available: boolean };
+
 export type Product = {
   id: number;
   name: string;
@@ -34,6 +36,11 @@ export type Product = {
   color: string;
   image?: string;
   stock: number;
+  // sizes/inStock are only meaningfully populated for products created or
+  // updated via the Excel catalog import (see lib/productImport.ts);
+  // manually added products don't have a per-size breakdown.
+  sizes?: SizeEntry[];
+  inStock?: boolean;
   garmentRegion?: GarmentRegion;
 };
 

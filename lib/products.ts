@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import type { Category, GarmentRegion, Product, Tag, Vertical } from "../app/data/products";
+import type { Category, GarmentRegion, Product, SizeEntry, Tag, Vertical } from "../app/data/products";
 
 export function toProduct(row: {
   id: number;
@@ -16,6 +16,8 @@ export function toProduct(row: {
   color: string;
   image: string | null;
   stock: number;
+  sizes: unknown;
+  inStock: boolean;
   garmentRegion: string | null;
 }): Product {
   return {
@@ -33,6 +35,8 @@ export function toProduct(row: {
     color: row.color,
     image: row.image ?? undefined,
     stock: row.stock,
+    sizes: (row.sizes as SizeEntry[] | null) ?? undefined,
+    inStock: row.inStock,
     garmentRegion: (row.garmentRegion as GarmentRegion | null) ?? undefined,
   };
 }

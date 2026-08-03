@@ -36,6 +36,12 @@ yarn-error.log*
 # local sqlite database
 /data/*.db
 
+# product catalog import staging -- an admin drops products.xlsx and image
+# files here before running the import; not source, keep folders only
+/product-import/products.xlsx
+/product-import/images/*
+!/product-import/images/.gitkeep
+
 # generated prisma client
 /lib/generated/
 

@@ -3,6 +3,11 @@ generator client {
   output   = "../lib/generated/prisma"
 }
 
+generator scriptsClient {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma-cjs"
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -66,12 +71,18 @@ model Product {
   color         String
   image         String?
   stock         Int      @default(0)
+  // Per-size breakdown from catalog import: [{ size, quantity, available }].
+  // Null for products never touched by the import (manually added via the
+  // admin form, which only tracks the single `stock` count).
+  sizes         Json?
+  inStock       Boolean  @default(true) @map("in_stock")
   vertical      Vertical @default(kids)
   garmentRegion GarmentRegion? @map("garment_region")
   createdAt     DateTime @default(now()) @map("created_at")
 
   cartItems CartItem[]
 
+  @@unique([name, vertical])
   @@map("products")
 }
 
