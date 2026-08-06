@@ -66,9 +66,9 @@ it's ever deployed publicly.
 |---|------|------|--------|
 | 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature |
 | 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Built through checkout, untested on device |
-| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Family Fit Profiles + Fit Confidence Score | Fully implemented (full CRUD + scoring, incl. age-based estimation for kids), uncommitted |
-| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | Fully implemented, verified live end-to-end, not deployed |
-| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | Fully implemented, pushed to GitHub, not deployed, not yet wired into the app |
+| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Family Fit Profiles + Fit Confidence Score | Deployed live on Railway, wired into the mobile app |
+| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | Deployed live on Railway, Cloudinary-backed proof uploads |
+| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | Deployed live on Railway, now the real production try-on path |
 
 ## Key product strategy — "Fit Certain"
 
@@ -110,16 +110,32 @@ other e-commerce brands once proven inside Happy Baby.
   it does so via an email-allowlist against the verified `email`, not a
   token claim. Something to be aware of if this app's auth is ever extended
   with real roles: the microservices would need updating too.
-- **Try-on currently has two independent implementations** — not yet
-  consolidated:
-  - This app's own `/api/try-on` route, originally built against fal.ai
-    then swapped to a free Hugging Face Space. This is what
-    `happy-baby-app` actually calls today.
-  - `happy-baby-tryon-service` is a new standalone, provider-agnostic
-    replacement built separately — thin routing layer only, no AI logic,
-    provider chosen via `PROVIDER` env var (`huggingface` implemented,
-    `self-hosted` stubbed). Not yet wired into this app — migrating this
-    app's `/api/try-on` callers over to it is still open.
+- **Try-on is now consolidated onto `happy-baby-tryon-service`** (updated
+  2026-08-07 — earlier notes in this file describing "two independent
+  implementations" are stale). This app's own `/api/try-on` route
+  (originally fal.ai, then a direct Hugging Face call) was migrated in an
+  earlier session to proxy to `TRYON_SERVICE_URL` instead of calling HF
+  itself — `happy-baby-app` calls this same route, unchanged on the mobile
+  side. `happy-baby-tryon-service` is deployed live on Railway
+  (`https://happy-baby-tryon-service-production.up.railway.app`).
+  - **`TRYON_SERVICE_URL` was broken in production until 2026-08-07**: it
+    was set on Vercel (Production + Preview) but to a value that failed
+    almost instantly (~2.4s, not a timeout) — consistent with still being
+    the code's `http://localhost:4002` fallback, which a Vercel serverless
+    function can never reach. Root cause on the other end: the tryon-service
+    Railway deployment itself had been serving the repo's very first
+    commit (pre-Gradio-rewrite) because the real fix commit was made
+    locally in an earlier session but never pushed to GitHub, and no
+    public domain had ever been generated for it. All of that is fixed —
+    see `happy-baby-tryon-service`'s own `CLAUDE.md` for the full
+    breakdown. Fixed here specifically by removing and re-adding
+    `TRYON_SERVICE_URL` via `vercel env` with the real Railway URL, then
+    `vercel redeploy` (env var changes don't retroactively affect an
+    already-running deployment — a fresh deploy is required).
+  - Verified with a real end-to-end request through the full chain (real
+    signed-up user, real product, real photo): this app's production
+    `/api/try-on` → the Railway tryon-service → the live `yisol/IDM-VTON`
+    Gradio Space → back, ~23s, correctly shaped `{ imageUrl }` response.
 
 ## Known technical decisions/gotchas (apply project-wide)
 
@@ -240,15 +256,17 @@ Express + TypeScript. Thin provider-agnostic wrapper — deliberately no AI
 model logic, just routes to whichever provider `PROVIDER` selects.
 
 - `POST /api/try-on` (multipart `personImage` + `garmentImage`) → forwards
-  to the active provider adapter, returns `{ imageUrl }` or
-  `{ imageBase64 }`. `HuggingFaceProvider` implemented against
-  `HUGGINGFACE_ENDPOINT_URL`; `SelfHostedProvider` stubbed for a future GPU
-  server. `GET /health`.
-- Verified end-to-end (build, validation, CORS, and the full upload →
-  provider → graceful-failure path).
-- Pushed to `https://github.com/Sireesh441/happy-baby-tryon-service`. Not
-  deployed, and not yet called by this app — this app's own `/api/try-on`
-  (see "Cross-repo integration facts") is still what's actually in use.
+  to the active provider adapter, returns `{ imageUrl }`. `HuggingFaceProvider`
+  talks to a Gradio Space (not a REST endpoint — free HF Spaces don't have
+  one) via `@gradio/client`, configured with `HUGGINGFACE_SPACE` (not
+  `HUGGINGFACE_ENDPOINT_URL`, which was the old, wrong design);
+  `SelfHostedProvider` stubbed for a future GPU server. `GET /health`.
+- **Deployed live on Railway**
+  (`https://happy-baby-tryon-service-production.up.railway.app`) and **is
+  now the real production try-on path** — see the "Cross-repo integration
+  facts" note above for the full story of what was broken (stale deployed
+  code + a placeholder `TRYON_SERVICE_URL` here on Vercel) and how it got
+  fixed on 2026-08-07.
 
 ---
 
