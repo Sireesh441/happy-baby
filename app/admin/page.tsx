@@ -6,6 +6,7 @@ import { getAllProducts } from "../../lib/products";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AdminPanel from "../components/admin/AdminPanel";
+import AdminNav from "../components/admin/AdminNav";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -25,7 +26,8 @@ export default async function AdminPage() {
       <Header />
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <h1 className="mb-8 text-3xl font-bold text-slate-800">Admin — Products</h1>
+          <h1 className="mb-4 text-3xl font-bold text-slate-800">Admin — Products</h1>
+          <AdminNav active="products" />
           <AdminPanel initialProducts={products} />
         </section>
       </main>
