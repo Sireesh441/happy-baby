@@ -68,6 +68,10 @@ model Product {
   tag           String?
   category      String
   emoji         String
+  // Tailwind gradient class (e.g. "bg-sky-100") used for card-background
+  // theming -- NOT the product's physical color. Predates variant grouping;
+  // kept as-is to avoid touching every place that reads it for styling.
+  // The actual garment/variant color lives in `variantColor` below.
   color         String
   image         String?
   stock         Int      @default(0)
@@ -80,10 +84,38 @@ model Product {
   garmentRegion GarmentRegion? @map("garment_region")
   createdAt     DateTime @default(now()) @map("created_at")
 
+  // Variant grouping (Amazon-style color swatches under one listing).
+  // Nullable for backward compatibility -- most existing products predate
+  // grouping and stay ungrouped (a "group of one") until explicitly grouped.
+  productGroupId Int?     @map("product_group_id")
+  productGroup   ProductGroup? @relation(fields: [productGroupId], references: [id], onDelete: SetNull)
+  // Physical variant color (e.g. "Blue Stripes"), distinct from the
+  // pre-existing `color` field above. Only meaningful once a product is
+  // grouped, but left independently settable (not required) since a
+  // standalone product can still have a known color.
+  variantColor   String?  @map("variant_color")
+
   cartItems CartItem[]
 
   @@unique([name, vertical])
+  @@index([productGroupId])
   @@map("products")
+}
+
+// The shared listing info across all color variants of the same item
+// (e.g. "Cotton Onesie" grouping "Blue Stripes" and "Red Stripes" Products).
+// Introduced for Amazon-style variant grouping -- see Product.productGroupId.
+model ProductGroup {
+  id          Int      @id @default(autoincrement())
+  name        String
+  vertical    Vertical
+  category    String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  products Product[]
+
+  @@map("product_groups")
 }
 
 model CartItem {

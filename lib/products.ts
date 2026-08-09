@@ -1,5 +1,14 @@
 import { prisma } from "./prisma";
-import type { Category, GarmentRegion, Product, SizeEntry, Tag, Vertical } from "../app/data/products";
+import type {
+  Category,
+  GarmentRegion,
+  Product,
+  ProductGroup,
+  ProductListItem,
+  SizeEntry,
+  Tag,
+  Vertical,
+} from "../app/data/products";
 
 export function toProduct(row: {
   id: number;
@@ -19,6 +28,8 @@ export function toProduct(row: {
   sizes: unknown;
   inStock: boolean;
   garmentRegion: string | null;
+  productGroupId?: number | null;
+  variantColor?: string | null;
 }): Product {
   return {
     id: row.id,
@@ -38,6 +49,24 @@ export function toProduct(row: {
     sizes: (row.sizes as SizeEntry[] | null) ?? undefined,
     inStock: row.inStock,
     garmentRegion: (row.garmentRegion as GarmentRegion | null) ?? undefined,
+    productGroupId: row.productGroupId ?? undefined,
+    variantColor: row.variantColor ?? undefined,
+  };
+}
+
+function toProductGroup(row: {
+  id: number;
+  name: string;
+  vertical: string;
+  category: string;
+  description: string | null;
+}): ProductGroup {
+  return {
+    id: row.id,
+    name: row.name,
+    vertical: row.vertical as Vertical,
+    category: row.category as Category,
+    description: row.description ?? undefined,
   };
 }
 
@@ -68,6 +97,66 @@ export async function getProductsByCategory(
     orderBy: { id: "asc" },
   });
   return rows.map(toProduct);
+}
+
+// Shop-grid listing: one entry per ProductGroup (the group's lowest-id
+// product stands in as the default/representative variant, matching how a
+// shop grid picks a "default" thumbnail for a multi-color listing) plus one
+// entry per ungrouped product. `variantCount` tells the grid how many color
+// options exist so it can show a swatch/count indicator.
+export async function getGroupedProducts(vertical?: Vertical): Promise<ProductListItem[]> {
+  const rows = await prisma.product.findMany({
+    where: vertical ? { vertical } : undefined,
+    orderBy: { id: "asc" },
+  });
+
+  const ungrouped: ProductListItem[] = [];
+  const groupedByGroupId = new Map<number, typeof rows>();
+
+  for (const row of rows) {
+    if (row.productGroupId == null) {
+      ungrouped.push({ ...toProduct(row), variantCount: 1 });
+      continue;
+    }
+    const existing = groupedByGroupId.get(row.productGroupId);
+    if (existing) {
+      existing.push(row);
+    } else {
+      groupedByGroupId.set(row.productGroupId, [row]);
+    }
+  }
+
+  const grouped: ProductListItem[] = [];
+  for (const variants of groupedByGroupId.values()) {
+    // Lowest id = the variant that existed first / was created first within
+    // the group, used as a stable, deterministic "default" pick.
+    const representative = variants.reduce((a, b) => (a.id < b.id ? a : b));
+    grouped.push({ ...toProduct(representative), variantCount: variants.length });
+  }
+
+  // Keep overall listing order stable (matches getAllProducts' `id asc`)
+  // by merging on the representative/only product's id rather than
+  // grouped-then-ungrouped.
+  return [...grouped, ...ungrouped].sort((a, b) => a.id - b.id);
+}
+
+export type ProductGroupWithVariants = {
+  group: ProductGroup;
+  variants: Product[];
+};
+
+export async function getProductGroupWithVariants(
+  groupId: number
+): Promise<ProductGroupWithVariants | undefined> {
+  const group = await prisma.productGroup.findUnique({ where: { id: groupId } });
+  if (!group) {
+    return undefined;
+  }
+  const rows = await prisma.product.findMany({
+    where: { productGroupId: groupId },
+    orderBy: { id: "asc" },
+  });
+  return { group: toProductGroup(group), variants: rows.map(toProduct) };
 }
 
 export type ProductInput = {

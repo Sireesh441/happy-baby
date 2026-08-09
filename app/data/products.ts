@@ -42,6 +42,28 @@ export type Product = {
   sizes?: SizeEntry[];
   inStock?: boolean;
   garmentRegion?: GarmentRegion;
+  // Variant grouping (Amazon-style color swatches under one listing).
+  // Null/undefined for products that aren't part of a group.
+  productGroupId?: number;
+  // The product's actual physical color (e.g. "Blue Stripes") -- distinct
+  // from `color` above, which is a Tailwind class used for card theming.
+  variantColor?: string;
+};
+
+// The shared info across all color variants of the same item.
+export type ProductGroup = {
+  id: number;
+  name: string;
+  vertical: Vertical;
+  category: Category;
+  description?: string;
+};
+
+// One entry per ProductGroup in shop-grid listings: a representative
+// variant plus how many color options exist in the group. Ungrouped
+// products are represented the same way with variantCount 1 and no group.
+export type ProductListItem = Product & {
+  variantCount: number;
 };
 
 export type CategoryMeta = {

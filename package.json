@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate --generator client",
     "db:migrate-data": "tsx scripts/migrate-sqlite-to-postgres.ts",
+    "group-product-variants": "tsx scripts/group-product-variants.ts",
     "import-products": "prisma generate --generator scriptsClient && node scripts/import-products.js"
   },
   "dependencies": {
