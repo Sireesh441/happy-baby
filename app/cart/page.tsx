@@ -14,7 +14,7 @@ import type { RazorpayPaymentResponse } from "../../types/razorpay";
 export default function CartPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { lines, itemCount, subtotal, updateQuantity, removeItem, clearCart } = useCart();
+  const { lines, itemCount, subtotal, updateQuantity, removeItem, removeBulkLine, clearCart } = useCart();
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
@@ -111,82 +111,122 @@ export default function CartPage() {
           ) : (
             <div className="grid gap-8 lg:grid-cols-3">
               <div className="flex flex-col gap-4 lg:col-span-2">
-                {lines.map(({ product, quantity }) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
-                  >
-                    <Link
-                      href={`/shop/${product.id}`}
-                      className={`relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br ${product.color.replace(
-                        "bg-",
-                        "from-"
-                      )} to-white`}
+                {lines.map((line) =>
+                  line.type === "bulk" ? (
+                    <div
+                      key={`bulk-${line.id}`}
+                      className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                     >
-                      {product.image ? (
-                        <Image
-                          src={product.image}
-                          alt={product.name}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <span className="text-3xl" aria-hidden="true">
-                          {product.emoji}
-                        </span>
-                      )}
-                    </Link>
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-indigo-100 to-white text-3xl">
+                        📦
+                      </div>
 
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/shop/${product.id}`}
-                        className="font-semibold text-slate-800 transition-colors hover:text-pink-500"
-                      >
-                        {product.name}
-                      </Link>
-                      <p className="mt-1 text-sm text-slate-500">{product.category}</p>
-                      <p className="mt-1 text-sm font-bold text-pink-500">
-                        ₹{product.price.toLocaleString("en-IN")}
-                      </p>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-800">
+                          {line.productGroupName} — Bulk {line.packSize}-Pack
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {line.breakdown.length} variant{line.breakdown.length === 1 ? "" : "s"} mixed
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-pink-500">
+                          ₹{line.pricePerUnit.toLocaleString("en-IN")}/unit (wholesale)
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-2 rounded-full border-2 border-pink-200 px-2 py-1">
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(product.id, quantity - 1)}
-                        aria-label={`Decrease quantity of ${product.name}`}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-pink-500 transition-colors hover:bg-pink-50"
-                      >
-                        −
-                      </button>
-                      <span className="w-5 text-center text-sm font-semibold text-slate-800">
-                        {quantity}
+                      <span className="w-14 shrink-0 text-center text-sm font-semibold text-slate-800">
+                        ×{line.quantity} pack{line.quantity === 1 ? "" : "s"}
                       </span>
+
+                      <p className="w-20 shrink-0 text-right font-semibold text-slate-800">
+                        ₹{(line.pricePerUnit * line.packSize * line.quantity).toLocaleString("en-IN")}
+                      </p>
+
                       <button
                         type="button"
-                        onClick={() => updateQuantity(product.id, quantity + 1)}
-                        aria-label={`Increase quantity of ${product.name}`}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-pink-500 transition-colors hover:bg-pink-50"
+                        onClick={() => removeBulkLine(line.id)}
+                        aria-label={`Remove ${line.productGroupName} bulk pack from cart`}
+                        className="shrink-0 text-lg text-slate-400 transition-colors hover:text-pink-500"
                       >
-                        +
+                        ✕
                       </button>
                     </div>
-
-                    <p className="w-20 shrink-0 text-right font-semibold text-slate-800">
-                      ₹{(product.price * quantity).toLocaleString("en-IN")}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => removeItem(product.id)}
-                      aria-label={`Remove ${product.name} from cart`}
-                      className="shrink-0 text-lg text-slate-400 transition-colors hover:text-pink-500"
+                  ) : (
+                    <div
+                      key={line.productId}
+                      className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <Link
+                        href={`/shop/${line.product.id}`}
+                        className={`relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br ${line.product.color.replace(
+                          "bg-",
+                          "from-"
+                        )} to-white`}
+                      >
+                        {line.product.image ? (
+                          <Image
+                            src={line.product.image}
+                            alt={line.product.name}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="text-3xl" aria-hidden="true">
+                            {line.product.emoji}
+                          </span>
+                        )}
+                      </Link>
+
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/shop/${line.product.id}`}
+                          className="font-semibold text-slate-800 transition-colors hover:text-pink-500"
+                        >
+                          {line.product.name}
+                        </Link>
+                        <p className="mt-1 text-sm text-slate-500">{line.product.category}</p>
+                        <p className="mt-1 text-sm font-bold text-pink-500">
+                          ₹{line.product.price.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 rounded-full border-2 border-pink-200 px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.productId, line.quantity - 1)}
+                          aria-label={`Decrease quantity of ${line.product.name}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-pink-500 transition-colors hover:bg-pink-50"
+                        >
+                          −
+                        </button>
+                        <span className="w-5 text-center text-sm font-semibold text-slate-800">
+                          {line.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.productId, line.quantity + 1)}
+                          aria-label={`Increase quantity of ${line.product.name}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-pink-500 transition-colors hover:bg-pink-50"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <p className="w-20 shrink-0 text-right font-semibold text-slate-800">
+                        ₹{(line.product.price * line.quantity).toLocaleString("en-IN")}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(line.productId)}
+                        aria-label={`Remove ${line.product.name} from cart`}
+                        className="shrink-0 text-lg text-slate-400 transition-colors hover:text-pink-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
 
               <div className="h-fit rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">

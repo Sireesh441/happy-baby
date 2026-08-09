@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { resolveBulkPricing, type BulkPricingOverride } from "./bulkPricing";
 import type {
   Category,
   GarmentRegion,
@@ -54,19 +55,24 @@ export function toProduct(row: {
   };
 }
 
-function toProductGroup(row: {
-  id: number;
-  name: string;
-  vertical: string;
-  category: string;
-  description: string | null;
-}): ProductGroup {
+function toProductGroup(
+  row: {
+    id: number;
+    name: string;
+    vertical: string;
+    category: string;
+    description: string | null;
+    bulkPricing: unknown;
+  },
+  representativePrice: number
+): ProductGroup {
   return {
     id: row.id,
     name: row.name,
     vertical: row.vertical as Vertical,
     category: row.category as Category,
     description: row.description ?? undefined,
+    bulkPricing: resolveBulkPricing(representativePrice, row.bulkPricing as BulkPricingOverride | null),
   };
 }
 
@@ -156,7 +162,11 @@ export async function getProductGroupWithVariants(
     where: { productGroupId: groupId },
     orderBy: { id: "asc" },
   });
-  return { group: toProductGroup(group), variants: rows.map(toProduct) };
+  // Lowest id = the group's representative variant (same convention used in
+  // getGroupedProducts) -- its retail price is what bulk pricing defaults
+  // off of when the group has no explicit bulkPricing override.
+  const representativePrice = rows[0]?.price ?? 0;
+  return { group: toProductGroup(group, representativePrice), variants: rows.map(toProduct) };
 }
 
 export type ProductInput = {

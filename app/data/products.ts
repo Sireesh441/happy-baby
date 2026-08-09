@@ -50,6 +50,15 @@ export type Product = {
   variantColor?: string;
 };
 
+// Resolved wholesale/bulk per-unit price for each pack size -- always fully
+// populated (never partial/null) once returned from the API: an explicit
+// override on the group wins per pack size, anything unset falls back to a
+// computed default. See lib/bulkPricing.ts for how this gets resolved.
+export type BulkPricing = {
+  pack5: number;
+  pack10: number;
+};
+
 // The shared info across all color variants of the same item.
 export type ProductGroup = {
   id: number;
@@ -57,7 +66,13 @@ export type ProductGroup = {
   vertical: Vertical;
   category: Category;
   description?: string;
+  bulkPricing: BulkPricing;
 };
+
+// A wholesale buyer's custom mix of sizes/colors from one ProductGroup,
+// summing to exactly 5 or 10 units -- the shape both persisted on a
+// bulk-pack CartItem and expected in POST /api/cart's bulk-pack payload.
+export type BulkBreakdownEntry = { productId: number; size?: string; quantity: number };
 
 // One entry per ProductGroup in shop-grid listings: a representative
 // variant plus how many color options exist in the group. Ungrouped

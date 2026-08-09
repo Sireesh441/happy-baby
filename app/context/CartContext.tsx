@@ -1,13 +1,32 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Product } from "../data/products";
+import type { BulkBreakdownEntry, Product } from "../data/products";
 
-export type CartLine = {
+export type SingleCartLine = {
+  type: "single";
+  id: number;
   productId: number;
   quantity: number;
   product: Product;
 };
+
+// A wholesale bulk pack -- see lib/cart.ts's BulkCartLine (server-side
+// counterpart) for the full shape/reasoning. Only ever created via a
+// direct POST /api/cart bulk-pack call today; this context has no UI path
+// that adds one, only rendering/removing whatever GET /api/cart returns.
+export type BulkCartLine = {
+  type: "bulk";
+  id: number;
+  productGroupId: number;
+  productGroupName: string;
+  packSize: number;
+  quantity: number;
+  pricePerUnit: number;
+  breakdown: BulkBreakdownEntry[];
+};
+
+export type CartLine = SingleCartLine | BulkCartLine;
 
 type CartSummary = {
   lines: CartLine[];
@@ -20,6 +39,7 @@ type CartContextValue = CartSummary & {
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
+  removeBulkLine: (id: number) => void;
   clearCart: () => void;
 };
 
@@ -41,14 +61,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function addItem(product: Product, quantity = 1) {
     setSummary((current) => {
-      const existing = current.lines.find((line) => line.productId === product.id);
-      const lines = existing
+      const existing = current.lines.find((line) => line.type === "single" && line.productId === product.id);
+      const lines: CartLine[] = existing
         ? current.lines.map((line) =>
-            line.productId === product.id
+            line.type === "single" && line.productId === product.id
               ? { ...line, quantity: line.quantity + quantity }
               : line
           )
-        : [...current.lines, { productId: product.id, quantity, product }];
+        : [...current.lines, { type: "single", id: -product.id, productId: product.id, quantity, product }];
       return recompute(lines);
     });
 
@@ -63,7 +83,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   function removeItem(productId: number) {
-    setSummary((current) => recompute(current.lines.filter((line) => line.productId !== productId)));
+    setSummary((current) =>
+      recompute(current.lines.filter((line) => !(line.type === "single" && line.productId === productId)))
+    );
 
     fetch(`/api/cart/${productId}`, { method: "DELETE" })
       .then((response) => response.json())
@@ -75,9 +97,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setSummary((current) =>
       recompute(
         quantity <= 0
-          ? current.lines.filter((line) => line.productId !== productId)
+          ? current.lines.filter((line) => !(line.type === "single" && line.productId === productId))
           : current.lines.map((line) =>
-              line.productId === productId ? { ...line, quantity } : line
+              line.type === "single" && line.productId === productId ? { ...line, quantity } : line
             )
       )
     );
@@ -92,6 +114,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }
 
+  // Bulk-pack lines have no single productId to key off of -- removed by
+  // their own cart-line id instead (see /api/cart/item/[id]).
+  function removeBulkLine(id: number) {
+    setSummary((current) => recompute(current.lines.filter((line) => !(line.type === "bulk" && line.id === id))));
+
+    fetch(`/api/cart/item/${id}`, { method: "DELETE" })
+      .then((response) => response.json())
+      .then((data: CartSummary) => setSummary(data))
+      .catch(() => {});
+  }
+
   function clearCart() {
     setSummary(EMPTY_SUMMARY);
     fetch("/api/cart", { method: "DELETE" }).catch(() => {});
@@ -99,7 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ ...summary, loading, addItem, removeItem, updateQuantity, clearCart }}
+      value={{ ...summary, loading, addItem, removeItem, updateQuantity, removeBulkLine, clearCart }}
     >
       {children}
     </CartContext.Provider>
@@ -109,8 +142,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 function recompute(lines: CartLine[]): CartSummary {
   return {
     lines,
-    itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
-    subtotal: lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
+    itemCount: lines.reduce((sum, line) => sum + (line.type === "bulk" ? line.packSize * line.quantity : line.quantity), 0),
+    subtotal: lines.reduce(
+      (sum, line) =>
+        sum + (line.type === "bulk" ? line.pricePerUnit * line.packSize * line.quantity : line.product.price * line.quantity),
+      0
+    ),
   };
 }
 

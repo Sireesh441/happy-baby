@@ -1,30 +1,45 @@
 import { NextResponse } from "next/server";
-import { addToCart, clearCart, getCart } from "../../../lib/cart";
+import { addBulkPackToCart, addToCart, clearCart, summarizeCart } from "../../../lib/cart";
 import { getExistingCartId, getOrCreateCartId } from "../../../lib/cartId";
-
-async function summarize(cartId: string | null) {
-  const lines = cartId ? await getCart(cartId) : [];
-  const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const subtotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
-  return { lines, itemCount, subtotal };
-}
 
 export async function GET() {
   const cartId = await getExistingCartId();
-  return NextResponse.json(await summarize(cartId));
+  return NextResponse.json(await summarizeCart(cartId));
 }
 
+// Accepts two payload shapes:
+//   - legacy single item: { productId, quantity }
+//   - wholesale bulk pack: { type: "bulk", productGroupId, packSize, breakdown, packs? }
+//     where breakdown is [{ productId, size?, quantity }] summing to exactly packSize.
 export async function POST(request: Request) {
-  const { productId, quantity } = await request.json();
+  const body = await request.json().catch(() => null);
+  const cartId = await getOrCreateCartId();
 
-  if (!Number.isFinite(productId) || !Number.isFinite(quantity) || quantity <= 0) {
+  if (body && typeof body === "object" && (body as { type?: unknown }).type === "bulk") {
+    const result = await addBulkPackToCart({
+      cartId,
+      productGroupId: Number((body as Record<string, unknown>).productGroupId),
+      packSize: (body as Record<string, unknown>).packSize,
+      breakdown: (body as Record<string, unknown>).breakdown,
+      packs: (body as Record<string, unknown>).packs,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    return NextResponse.json(await summarizeCart(cartId), { status: 201 });
+  }
+
+  const productId = (body as { productId?: unknown } | null)?.productId;
+  const quantity = (body as { quantity?: unknown } | null)?.quantity;
+
+  if (!Number.isFinite(productId) || !Number.isFinite(quantity) || Number(quantity) <= 0) {
     return NextResponse.json({ error: "Invalid productId or quantity." }, { status: 400 });
   }
 
-  const cartId = await getOrCreateCartId();
   await addToCart(cartId, Number(productId), Number(quantity));
 
-  return NextResponse.json(await summarize(cartId), { status: 201 });
+  return NextResponse.json(await summarizeCart(cartId), { status: 201 });
 }
 
 export async function DELETE() {
@@ -32,5 +47,5 @@ export async function DELETE() {
   if (cartId) {
     await clearCart(cartId);
   }
-  return NextResponse.json(await summarize(cartId));
+  return NextResponse.json(await summarizeCart(cartId));
 }

@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCart, removeFromCart, setCartItemQuantity } from "../../../../lib/cart";
+import { removeFromCart, setCartItemQuantity, summarizeCart } from "../../../../lib/cart";
 import { getExistingCartId, getOrCreateCartId } from "../../../../lib/cartId";
-
-async function summarize(cartId: string | null) {
-  const lines = cartId ? await getCart(cartId) : [];
-  const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const subtotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
-  return { lines, itemCount, subtotal };
-}
 
 export async function PUT(
   request: Request,
@@ -23,7 +16,7 @@ export async function PUT(
   const cartId = await getOrCreateCartId();
   await setCartItemQuantity(cartId, Number(productId), Number(quantity));
 
-  return NextResponse.json(await summarize(cartId));
+  return NextResponse.json(await summarizeCart(cartId));
 }
 
 export async function DELETE(
@@ -37,5 +30,5 @@ export async function DELETE(
     await removeFromCart(cartId, Number(productId));
   }
 
-  return NextResponse.json(await summarize(cartId));
+  return NextResponse.json(await summarizeCart(cartId));
 }

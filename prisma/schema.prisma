@@ -111,9 +111,17 @@ model ProductGroup {
   vertical    Vertical
   category    String
   description String?
+  // Wholesale/bulk pricing override: { pack5?: number, pack10?: number },
+  // whole-rupee per-unit price for a 5-pack / 10-pack respectively. Either
+  // key may be omitted -- omitted keys fall back to a computed default
+  // (roughly 15% off the group's representative variant price for a
+  // 5-pack, 20% off for a 10-pack; see lib/bulkPricing.ts). Null means
+  // "use the computed default for both pack sizes."
+  bulkPricing Json?    @map("bulk_pricing")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  products Product[]
+  products  Product[]
+  cartItems CartItem[]
 
   @@map("product_groups")
 }
@@ -121,13 +129,33 @@ model ProductGroup {
 model CartItem {
   id        Int      @id @default(autoincrement())
   cartId    String   @map("cart_id")
-  productId Int      @map("product_id")
+  // Null for a bulk-pack line (see below) -- a bulk pack is a mix of several
+  // products from one ProductGroup, not a single product, so it has no one
+  // productId of its own.
+  productId Int?     @map("product_id")
+  // Normal line: units of `product`. Bulk-pack line: number of packs (each
+  // pack itself contains `packSize` units per `bulkBreakdown`).
   quantity  Int
   createdAt DateTime @default(now()) @map("created_at")
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Wholesale/bulk-pack line item support. These four are set together for
+  // a bulk-pack line and left null for a normal single-product line.
+  productGroupId Int?  @map("product_group_id")
+  // 5 or 10.
+  packSize       Int?  @map("pack_size")
+  // [{ productId, size?, quantity }] entries picked from the group's
+  // variants, summing to exactly `packSize`.
+  bulkBreakdown  Json? @map("bulk_breakdown")
+  // Snapshot of the resolved per-unit bulk price at add-time, so a later
+  // change to ProductGroup.bulkPricing doesn't retroactively reprice
+  // something already sitting in a cart.
+  bulkPricePerUnit Int? @map("bulk_price_per_unit")
+
+  product      Product?      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productGroup ProductGroup? @relation(fields: [productGroupId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, productId])
+  @@index([productGroupId])
   @@map("cart_items")
 }
 
