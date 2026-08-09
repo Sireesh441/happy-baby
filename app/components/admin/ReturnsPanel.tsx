@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Order } from "../../../lib/orders";
+import type { Order, RetailOrderLineItem } from "../../../lib/orders";
 import type { ProofRecord, ReturnCase, ReturnCaseStatus } from "../../../lib/returnsService";
 
 const STATUS_LABELS: Record<ReturnCaseStatus, string> = {
@@ -62,7 +62,13 @@ function ReturnCaseCard({
 }) {
   const packing = returnCase.proofRecords.find((p) => p.type === "packing");
   const unboxing = returnCase.proofRecords.find((p) => p.type === "unboxing");
-  const item = order?.items.find((i) => i.id === returnCase.itemId);
+  // Bulk-pack order lines have no single `id` -- returns-protection's
+  // itemId-based model doesn't know about bulk packs at all yet, so only
+  // retail lines are matchable here. Explicit type predicate so `item`
+  // below is narrowed to RetailOrderLineItem, not the full union.
+  const item = order?.items.find(
+    (i): i is RetailOrderLineItem => i.type !== "bulk" && i.id === returnCase.itemId
+  );
   // Locale pinned to "en-US" (not the visitor's own locale via `undefined`)
   // -- this renders both during SSR (Node's default locale) and again on
   // the client during hydration (the browser's locale); if those two ever

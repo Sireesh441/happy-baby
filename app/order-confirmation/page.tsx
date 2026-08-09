@@ -85,40 +85,67 @@ function OrderConfirmationContent() {
           <div className="mt-8">
             <h2 className="mb-4 text-lg font-bold text-slate-800">Items</h2>
             <div className="flex flex-col gap-3">
-              {order.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-4 rounded-2xl border border-slate-100 p-3"
-                >
+              {order.items.map((item, index) =>
+                item.type === "bulk" ? (
                   <div
-                    className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br ${item.color.replace(
-                      "bg-",
-                      "from-"
-                    )} to-white`}
+                    key={`bulk-${item.productGroupId}-${index}`}
+                    className="flex items-center gap-4 rounded-2xl border border-slate-100 p-3"
                   >
-                    {item.image ? (
-                      <Image
-                        src={item.image}
-                        alt={item.name}
-                        fill
-                        sizes="56px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl" aria-hidden="true">
-                        {item.emoji}
-                      </span>
-                    )}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-indigo-100 to-white text-2xl">
+                      📦
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-slate-800">
+                        {item.productGroupName} — Bulk {item.packSize}-Pack
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {item.breakdownDisplay.length} variant{item.breakdownDisplay.length === 1 ? "" : "s"} mixed
+                        {" · "}
+                        {item.breakdownDisplay.map((entry) => `${entry.name}${entry.size ? ` (${entry.size})` : ""} ×${entry.quantity}`).join(", ")}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        Qty: {item.quantity} pack{item.quantity === 1 ? "" : "s"} · ₹{item.pricePerUnit.toLocaleString("en-IN")}/unit
+                      </p>
+                    </div>
+                    <p className="font-semibold text-slate-800">
+                      ₹{(item.pricePerUnit * item.packSize * item.quantity).toLocaleString("en-IN")}
+                    </p>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-slate-800">{item.name}</p>
-                    <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
+                ) : (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-4 rounded-2xl border border-slate-100 p-3"
+                  >
+                    <div
+                      className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br ${item.color.replace(
+                        "bg-",
+                        "from-"
+                      )} to-white`}
+                    >
+                      {item.image ? (
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          fill
+                          sizes="56px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl" aria-hidden="true">
+                          {item.emoji}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-slate-800">{item.name}</p>
+                      <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="font-semibold text-slate-800">
+                      ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                    </p>
                   </div>
-                  <p className="font-semibold text-slate-800">
-                    ₹{(item.price * item.quantity).toLocaleString("en-IN")}
-                  </p>
-                </div>
-              ))}
+                )
+              )}
             </div>
           </div>
 

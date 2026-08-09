@@ -118,6 +118,13 @@ model ProductGroup {
   // 5-pack, 20% off for a 10-pack; see lib/bulkPricing.ts). Null means
   // "use the computed default for both pack sizes."
   bulkPricing Json?    @map("bulk_pricing")
+  // The Excel catalog import's `parent_sku` column -- lets
+  // scripts/import-products.js find an existing group across separate
+  // import runs (otherwise re-running the import would create a duplicate
+  // ProductGroup every time instead of updating the same one). Null for
+  // groups created any other way (e.g. the Day 29-30 name-matching
+  // backfill script), which have no SKU to key off of.
+  sku         String?  @unique
   createdAt   DateTime @default(now()) @map("created_at")
 
   products  Product[]

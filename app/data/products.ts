@@ -74,6 +74,16 @@ export type ProductGroup = {
 // bulk-pack CartItem and expected in POST /api/cart's bulk-pack payload.
 export type BulkBreakdownEntry = { productId: number; size?: string; quantity: number };
 
+// A breakdown entry denormalized with display info at the time an order was
+// placed, so order history/admin views can show what was actually bought
+// without re-looking-up products that may have since changed name/image or
+// been deleted entirely.
+export type BulkBreakdownDisplayEntry = BulkBreakdownEntry & {
+  name: string;
+  image?: string;
+  emoji: string;
+};
+
 // One entry per ProductGroup in shop-grid listings: a representative
 // variant plus how many color options exist in the group. Ungrouped
 // products are represented the same way with variantCount 1 and no group.

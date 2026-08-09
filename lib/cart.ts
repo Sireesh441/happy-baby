@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { toProduct } from "./products";
-import { resolveBulkPricing, type BulkPricingOverride } from "./bulkPricing";
+import { validateAndPriceBulkPack } from "./bulkPack";
 import type { BulkBreakdownEntry, Product } from "../app/data/products";
 import type { Prisma } from "./generated/prisma/client";
 
@@ -134,111 +134,37 @@ export type AddBulkPackResult = { ok: true } | { ok: false; error: string };
 /**
  * Validates and adds a wholesale bulk-pack line to the cart: a mix of
  * sizes/colors picked from one ProductGroup's variants, summing to exactly
- * 5 or 10 units, priced at the group's resolved bulk per-unit rate. Every
- * input is `unknown` on purpose -- this is the boundary that validates a
- * raw JSON request body, not a typed internal call.
+ * 5 or 10 units, priced at the group's resolved bulk per-unit rate. All the
+ * actual validation/pricing lives in lib/bulkPack.ts's
+ * validateAndPriceBulkPack -- shared with order creation so there's one
+ * authoritative place that resolves a bulk price, not two that could drift.
  */
 export async function addBulkPackToCart(input: AddBulkPackInput): Promise<AddBulkPackResult> {
-  const { cartId, productGroupId } = input;
-
-  if (!Number.isInteger(productGroupId) || productGroupId <= 0) {
-    return { ok: false, error: "productGroupId is required." };
-  }
-  if (input.packSize !== 5 && input.packSize !== 10) {
-    return { ok: false, error: "packSize must be 5 or 10." };
-  }
-  const packSize = input.packSize;
+  const { cartId } = input;
 
   const packs = input.packs == null ? 1 : Number(input.packs);
   if (!Number.isInteger(packs) || packs < 1) {
     return { ok: false, error: "packs must be a positive integer." };
   }
 
-  if (!Array.isArray(input.breakdown) || input.breakdown.length === 0) {
-    return { ok: false, error: "breakdown must be a non-empty array of { productId, size, quantity }." };
-  }
-
-  const breakdown: BulkBreakdownEntry[] = [];
-  let totalUnits = 0;
-  for (const raw of input.breakdown) {
-    const entry = raw as Record<string, unknown>;
-    const entryProductId = Number(entry.productId);
-    const entryQuantity = Number(entry.quantity);
-    const entrySize = typeof entry.size === "string" ? entry.size : undefined;
-
-    if (!Number.isInteger(entryProductId) || entryProductId <= 0) {
-      return { ok: false, error: "Each breakdown entry needs a valid productId." };
-    }
-    if (!Number.isInteger(entryQuantity) || entryQuantity < 1) {
-      return { ok: false, error: "Each breakdown entry needs a positive integer quantity." };
-    }
-    breakdown.push({ productId: entryProductId, size: entrySize, quantity: entryQuantity });
-    totalUnits += entryQuantity;
-  }
-
-  if (totalUnits !== packSize) {
-    return {
-      ok: false,
-      error: `Breakdown quantities sum to ${totalUnits}, but must sum to exactly ${packSize} for a ${packSize}-pack.`,
-    };
-  }
-
-  const group = await prisma.productGroup.findUnique({ where: { id: productGroupId } });
-  if (!group) {
-    return { ok: false, error: "Product group not found." };
-  }
-
-  const productIds = [...new Set(breakdown.map((entry) => entry.productId))];
-  const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
-  const productById = new Map(products.map((product) => [product.id, product]));
-
-  for (const entry of breakdown) {
-    const product = productById.get(entry.productId);
-    if (!product) {
-      return { ok: false, error: `Product ${entry.productId} not found.` };
-    }
-    if (product.productGroupId !== productGroupId) {
-      return {
-        ok: false,
-        error: `Product ${entry.productId} ("${product.name}") is not a variant of product group ${productGroupId}.`,
-      };
-    }
-    if (entry.size) {
-      const sizes = product.sizes as { size: string; available: boolean }[] | null;
-      if (sizes && sizes.length > 0) {
-        const sizeEntry = sizes.find((s) => s.size === entry.size);
-        if (!sizeEntry) {
-          return { ok: false, error: `"${entry.size}" is not a valid size for "${product.name}".` };
-        }
-        if (!sizeEntry.available) {
-          return { ok: false, error: `"${entry.size}" for "${product.name}" is out of stock.` };
-        }
-      }
-    }
-  }
-
-  // Same representative-variant convention as getProductGroupWithVariants
-  // (lowest id in the group), so this always prices identically to what
-  // GET /api/products/group/:id showed the buyer before they added it.
-  const representative = await prisma.product.findFirst({
-    where: { productGroupId },
-    orderBy: { id: "asc" },
+  const result = await validateAndPriceBulkPack({
+    productGroupId: input.productGroupId,
+    packSize: input.packSize,
+    breakdown: input.breakdown,
   });
-  if (!representative) {
-    return { ok: false, error: "Product group has no variants to price a bulk pack from." };
+  if (!result.ok) {
+    return result;
   }
-
-  const resolved = resolveBulkPricing(representative.price, group.bulkPricing as BulkPricingOverride | null);
-  const pricePerUnit = packSize === 5 ? resolved.pack5 : resolved.pack10;
+  const { pack } = result;
 
   await prisma.cartItem.create({
     data: {
       cartId,
       quantity: packs,
-      productGroupId,
-      packSize,
-      bulkBreakdown: breakdown as unknown as Prisma.InputJsonValue,
-      bulkPricePerUnit: pricePerUnit,
+      productGroupId: pack.productGroupId,
+      packSize: pack.packSize,
+      bulkBreakdown: pack.breakdown as unknown as Prisma.InputJsonValue,
+      bulkPricePerUnit: pack.pricePerUnit,
     },
   });
 

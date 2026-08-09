@@ -2,6 +2,7 @@
 
 // Local dev-time product catalog import. Run with:
 //   node scripts/import-products.js
+//   node scripts/import-products.js path/to/other-workbook.xlsx   (optional override, mainly for testing)
 // (from the project root -- NOT a web-based admin feature, since Vercel's
 // serverless filesystem is ephemeral and can't hold /product-import or
 // persist writes to public/products).
@@ -12,6 +13,41 @@
 // plain `node` script can't require directly) and the same category/emoji
 // /color metadata the admin panel and product API already use
 // (app/data/products.ts), so none of that is duplicated here.
+//
+// Expected worksheet columns (header row, case-insensitive, spaces or
+// underscores both fine):
+//   Required on every row:
+//     vertical, category, product_name, description, price, sizes_and_quantity
+//   Optional, per row:
+//     discount_price, tag, image_filename
+//     parent_sku  -- shared across rows that are color variants of the same
+//                    item. Rows sharing a parent_sku are grouped into one
+//                    ProductGroup (Amazon-style color swatches); a blank
+//                    parent_sku imports as a standalone ungrouped product,
+//                    same as before this column existed.
+//     color       -- this row's own variant color (e.g. "Blue Stripes"),
+//                    stored on the product as `variantColor`. Meaningful for
+//                    any row, grouped or not.
+//   Optional, group-level (only read from the FIRST row of a given
+//   parent_sku -- see "Variant grouping" below for why):
+//     bulk_pack5_price, bulk_pack10_price
+//                    -- explicit wholesale per-unit price override for that
+//                       group's 5-pack / 10-pack. Either or both may be left
+//                       blank, in which case that pack size keeps the
+//                       computed default (~15%/20% off retail -- see
+//                       lib/bulkPricing.ts). These only apply to grouped
+//                       rows; a parent_sku is required for them to do
+//                       anything.
+//
+// Variant grouping: the group's shared info (name/vertical/category/
+// description, and any bulk_pack5_price/bulk_pack10_price) is taken from
+// whichever row is the FIRST one carrying a given parent_sku, in top-to-
+// bottom sheet order -- later rows for the same parent_sku only contribute
+// their own product data (name, color, price, sizes, image), not group
+// data. A ProductGroup is matched across separate runs of this script by
+// parent_sku (stored as ProductGroup.sku) -- re-running the import against
+// an unchanged sheet updates the same group and its variants rather than
+// creating duplicates.
 
 const path = require("node:path");
 const fs = require("node:fs");
@@ -27,7 +63,12 @@ const { getCategoryMeta } = require("../app/data/products.ts");
 
 const PRODUCT_IMPORT_DIR = path.join(__dirname, "..", "product-import");
 const PRODUCT_IMPORT_IMAGES_DIR = path.join(PRODUCT_IMPORT_DIR, "images");
-const PRODUCTS_XLSX_PATH = path.join(PRODUCT_IMPORT_DIR, "products.xlsx");
+// Optional CLI override (`node scripts/import-products.js path/to.xlsx`) --
+// mainly so this script can be tested against a throwaway workbook without
+// ever touching the real, gitignored product-import/products.xlsx.
+const PRODUCTS_XLSX_PATH = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(PRODUCT_IMPORT_DIR, "products.xlsx");
 
 const VALID_VERTICALS = ["kids", "men", "women"];
 const VALID_TAGS = ["Bestseller", "New", "Sale"];
@@ -123,10 +164,10 @@ async function uploadImageToCloudinary(filename, vertical) {
 }
 
 async function importProducts() {
-  const summary = { created: 0, updated: 0, errors: [], warnings: [] };
+  const summary = { created: 0, updated: 0, groupsCreated: 0, groupsUpdated: 0, errors: [], warnings: [] };
 
   if (!fs.existsSync(PRODUCTS_XLSX_PATH)) {
-    summary.errors.push({ row: 0, message: "Could not find /product-import/products.xlsx." });
+    summary.errors.push({ row: 0, message: `Could not find ${PRODUCTS_XLSX_PATH}.` });
     return summary;
   }
 
@@ -152,6 +193,16 @@ async function importProducts() {
   }
 
   const get = (row, key) => (columnIndex[key] ? row.getCell(columnIndex[key]).value : null);
+
+  // parent_sku -> ProductGroup id, populated the first time each parent_sku
+  // is seen in this run. Rows sharing a parent_sku after that just look
+  // their group id up here instead of touching the group again.
+  const groupCache = new Map();
+  // parent_sku -> the { vertical, bulk5, bulk10 } that its first row
+  // established, purely so later rows for the same group can warn if they
+  // disagree (their own values are otherwise ignored, per the "first row
+  // wins" rule for group-level data).
+  const groupFirstRowInfo = new Map();
 
   for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
     const row = worksheet.getRow(rowNumber);
@@ -225,6 +276,71 @@ async function importProducts() {
         }
       }
 
+      // --- Variant grouping ---
+      const parentSku = cellString(get(row, "parent_sku"));
+      const colorRaw = cellString(get(row, "color"));
+      let productGroupId = null;
+
+      if (parentSku) {
+        if (groupCache.has(parentSku)) {
+          productGroupId = groupCache.get(parentSku);
+
+          const firstRowInfo = groupFirstRowInfo.get(parentSku);
+          if (firstRowInfo && firstRowInfo.vertical !== vertical) {
+            summary.warnings.push({
+              row: rowNumber,
+              productName,
+              message: `parent_sku "${parentSku}" was first seen with vertical "${firstRowInfo.vertical}" (row ${firstRowInfo.row}) -- this row's vertical "${vertical}" is ignored for the group, but still used for this product.`,
+            });
+          }
+          const pack5Conflict = cellNumber(get(row, "bulk_pack5_price"));
+          const pack10Conflict = cellNumber(get(row, "bulk_pack10_price"));
+          if (
+            (pack5Conflict !== null || pack10Conflict !== null) &&
+            (pack5Conflict !== firstRowInfo?.pack5 || pack10Conflict !== firstRowInfo?.pack10)
+          ) {
+            summary.warnings.push({
+              row: rowNumber,
+              productName,
+              message: `bulk_pack5_price/bulk_pack10_price on this row are ignored -- only the group's first row (row ${firstRowInfo?.row}) sets them.`,
+            });
+          }
+        } else {
+          // This is the first row seen for this parent_sku -- it defines
+          // the group's shared info.
+          const pack5 = cellNumber(get(row, "bulk_pack5_price"));
+          const pack10 = cellNumber(get(row, "bulk_pack10_price"));
+          let bulkPricing = null;
+          if (pack5 !== null || pack10 !== null) {
+            bulkPricing = {};
+            if (pack5 !== null) bulkPricing.pack5 = pack5;
+            if (pack10 !== null) bulkPricing.pack10 = pack10;
+          }
+
+          const groupData = {
+            name: productName,
+            vertical,
+            category: categoryMeta.name,
+            description,
+            bulkPricing,
+          };
+
+          const existingGroup = await prisma.productGroup.findUnique({ where: { sku: parentSku } });
+          let group;
+          if (existingGroup) {
+            group = await prisma.productGroup.update({ where: { id: existingGroup.id }, data: groupData });
+            summary.groupsUpdated++;
+          } else {
+            group = await prisma.productGroup.create({ data: { ...groupData, sku: parentSku } });
+            summary.groupsCreated++;
+          }
+
+          productGroupId = group.id;
+          groupCache.set(parentSku, productGroupId);
+          groupFirstRowInfo.set(parentSku, { row: rowNumber, vertical, pack5, pack10 });
+        }
+      }
+
       const sharedData = {
         description,
         price: hasDiscount ? discountPrice : price,
@@ -236,6 +352,8 @@ async function importProducts() {
         sizes,
         inStock,
         tag,
+        productGroupId,
+        variantColor: colorRaw || null,
       };
 
       const existing = await prisma.product.findFirst({ where: { name: productName, vertical } });
@@ -271,6 +389,8 @@ async function main() {
 
   console.log(`\nCreated: ${summary.created}`);
   console.log(`Updated: ${summary.updated}`);
+  console.log(`Groups created: ${summary.groupsCreated}`);
+  console.log(`Groups updated: ${summary.groupsUpdated}`);
 
   if (summary.warnings.length > 0) {
     console.log(`\nWarnings (${summary.warnings.length}):`);
