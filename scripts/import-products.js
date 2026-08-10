@@ -28,6 +28,16 @@
 //     color       -- this row's own variant color (e.g. "Blue Stripes"),
 //                    stored on the product as `variantColor`. Meaningful for
 //                    any row, grouped or not.
+//     subcategory -- only meaningful when category is "Clothing"; must be
+//                    one of CLOTHING_SUBCATEGORIES[vertical] from
+//                    app/data/products.ts (e.g. kids: Onesies, T-shirts,
+//                    Bottoms, Sleepwear, Outerwear). An unknown value on a
+//                    Clothing row is a hard error (same treatment as an
+//                    unknown category); a non-blank value on a non-Clothing
+//                    row is ignored with a warning rather than an error,
+//                    since subcategory simply doesn't apply there. Blank is
+//                    always fine (subcategory is optional even for
+//                    Clothing).
 //   Optional, group-level (only read from the FIRST row of a given
 //   parent_sku -- see "Variant grouping" below for why):
 //     bulk_pack5_price, bulk_pack10_price
@@ -59,7 +69,7 @@ const ExcelJS = require("exceljs");
 const { v2: cloudinary } = require("cloudinary");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { PrismaClient } = require("../lib/generated/prisma-cjs");
-const { getCategoryMeta } = require("../app/data/products.ts");
+const { getCategoryMeta, isValidClothingSubcategory } = require("../app/data/products.ts");
 
 const PRODUCT_IMPORT_DIR = path.join(__dirname, "..", "product-import");
 const PRODUCT_IMPORT_IMAGES_DIR = path.join(PRODUCT_IMPORT_DIR, "images");
@@ -232,6 +242,29 @@ async function importProducts() {
         continue;
       }
 
+      const subcategoryRaw = cellString(get(row, "subcategory"));
+      let subcategory = null;
+      if (subcategoryRaw) {
+        if (categoryMeta.name === "Clothing") {
+          if (isValidClothingSubcategory(vertical, subcategoryRaw)) {
+            subcategory = subcategoryRaw;
+          } else {
+            summary.errors.push({
+              row: rowNumber,
+              productName,
+              message: `Unknown subcategory "${subcategoryRaw}" for vertical "${vertical}" Clothing.`,
+            });
+            continue;
+          }
+        } else {
+          summary.warnings.push({
+            row: rowNumber,
+            productName,
+            message: `subcategory "${subcategoryRaw}" ignored -- only applies to category "Clothing".`,
+          });
+        }
+      }
+
       const description = cellString(get(row, "description"));
       const price = cellNumber(get(row, "price"));
       if (!description || price === null || price <= 0) {
@@ -346,6 +379,7 @@ async function importProducts() {
         price: hasDiscount ? discountPrice : price,
         originalPrice: hasDiscount ? price : null,
         category: categoryMeta.name,
+        subcategory,
         emoji: categoryMeta.emoji,
         color: categoryMeta.color,
         stock: totalStock,

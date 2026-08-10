@@ -1,8 +1,8 @@
 @AGENTS.md
 
-# Happy Baby — Multi-Repo Project Context
+# Happy Shopping — Multi-Repo Project Context
 
-Happy Baby is a multi-vertical e-commerce platform (Kids/Men/Women, branded
+Happy Shopping is a multi-vertical e-commerce platform (Kids/Men/Women, branded
 "Happy Baby"/"Happy Men"/"Happy Women") with a web app and mobile app sharing
 one backend, plus three standalone microservices being built to eventually
 sell as independent B2B products. This same file is kept in sync across all
@@ -96,7 +96,7 @@ like Myntra/Ajio has this), (4) Proof-Locked Returns — targeting the two
 biggest validated complaint themes in Indian fashion e-commerce reviews
 (unfair return rejections, refund transparency). Long-term: package
 fit-engine, returns-protection, and tryon-service as standalone B2B SaaS for
-other e-commerce brands once proven inside Happy Baby.
+other e-commerce brands once proven inside Happy Shopping.
 
 ## Cross-repo integration facts
 
@@ -218,7 +218,7 @@ NextAuth (Credentials provider, JWT session strategy) for web sessions,
 custom JWT endpoints (`/api/mobile-auth/login`, `/signup`, `/me`) for the
 mobile app (signing/verification in `lib/mobileJwt.ts` — payload is exactly
 `{ sub, name, email }`, 30-day expiry, nothing else — no `isAdmin` claim).
-Razorpay payments. Anthropic-powered "Ask Happy Baby" assistant. Cloudinary
+Razorpay payments. Anthropic-powered "Ask Happy Shopping" assistant. Cloudinary
 for image hosting (product-import pipeline). Confirmed via a live
 production walkthrough today (signup, login, mobile-auth, products, cart,
 orders, and a real Razorpay test-mode payment with real signature

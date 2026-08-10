@@ -4,7 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { requireAdminSession } from "../../../lib/apiAuth";
 import { corsPreflight, withCors } from "../../../lib/cors";
 import { createProduct, getGroupedProducts } from "../../../lib/products";
-import { getCategoryMeta, type Vertical } from "../../../app/data/products";
+import { getCategoryMeta, isValidClothingSubcategory, type Vertical } from "../../../app/data/products";
 
 async function saveUploadedImage(file: File): Promise<string> {
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -24,7 +24,12 @@ async function saveUploadedImage(file: File): Promise<string> {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const verticalParam = url.searchParams.get("vertical") as Vertical | null;
-  return withCors(NextResponse.json(await getGroupedProducts(verticalParam ?? undefined)));
+  const subcategoryParam = url.searchParams.get("subcategory");
+  return withCors(
+    NextResponse.json(
+      await getGroupedProducts(verticalParam ?? undefined, subcategoryParam ?? undefined)
+    )
+  );
 }
 
 export async function OPTIONS() {
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const category = String(formData.get("category") ?? "");
+  const subcategory = String(formData.get("subcategory") ?? "").trim();
   const vertical = String(formData.get("vertical") ?? "") as Vertical;
   const price = Number(formData.get("price"));
   const discountPriceRaw = formData.get("discountPrice");
@@ -50,6 +56,7 @@ export async function POST(request: Request) {
   const imageFile = formData.get("image");
 
   const categoryMeta = getCategoryMeta(category, vertical);
+  const isClothing = categoryMeta?.name === "Clothing";
 
   if (
     !name ||
@@ -58,7 +65,8 @@ export async function POST(request: Request) {
     !Number.isFinite(price) ||
     price <= 0 ||
     !Number.isFinite(stock) ||
-    stock < 0
+    stock < 0 ||
+    (isClothing && subcategory && !isValidClothingSubcategory(vertical, subcategory))
   ) {
     return NextResponse.json({ error: "Please fill in all fields with valid values." }, { status: 400 });
   }
@@ -76,6 +84,7 @@ export async function POST(request: Request) {
     price: hasDiscount ? discountPrice! : price,
     originalPrice: hasDiscount ? price : undefined,
     category: categoryMeta.name,
+    subcategory: isClothing && subcategory ? subcategory : undefined,
     vertical: categoryMeta.vertical,
     emoji: emoji || categoryMeta.emoji,
     color: categoryMeta.color,

@@ -67,6 +67,11 @@ model Product {
   reviewCount   Int      @default(0) @map("review_count")
   tag           String?
   category      String
+  // Only meaningful when category is "Clothing" -- see
+  // CLOTHING_SUBCATEGORIES in app/data/products.ts for the allowed values
+  // per vertical. Null for every other category, and null for Clothing
+  // products that haven't been given one (optional, not required).
+  subcategory   String?
   emoji         String
   // Tailwind gradient class (e.g. "bg-sky-100") used for card-background
   // theming -- NOT the product's physical color. Predates variant grouping;

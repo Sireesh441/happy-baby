@@ -97,7 +97,7 @@ export default function AssistantChatWidget() {
       {open && (
         <div className="flex h-112 w-80 flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl sm:w-96">
           <div className="flex items-center justify-between bg-pink-500 px-4 py-3 text-white">
-            <p className="font-semibold">Ask HappyBaby</p>
+            <p className="font-semibold">Ask Happy Shopping</p>
             <button
               type="button"
               onClick={() => setOpen(false)}

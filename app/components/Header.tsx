@@ -22,7 +22,13 @@ const BRAND: Record<HeaderVertical, { name: string; emoji: string; accent: strin
   shopping: { name: "Happy Shopping", emoji: "🛍️", accent: "text-pink-500" },
 };
 
-export default function Header({ vertical = "kids" }: { vertical?: HeaderVertical }) {
+// Defaults to "shopping" (the overall-platform brand), not a specific
+// vertical -- callers that render a vertical-specific page (e.g. /kids,
+// /shop/[vertical]) pass their own vertical explicitly. Cross-vertical
+// pages (cart, login, signup, admin, categories, order-confirmation) never
+// passed a vertical at all, so before this default was "shopping" they
+// accidentally showed Kids branding on pages that aren't Kids-specific.
+export default function Header({ vertical = "shopping" }: { vertical?: HeaderVertical }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { itemCount } = useCart();
   const { data: session, status } = useSession();

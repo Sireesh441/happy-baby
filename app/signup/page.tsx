@@ -56,7 +56,7 @@ export default function SignupPage() {
       <main className="flex flex-1 items-center justify-center px-4 py-16 sm:px-6">
         <div className="w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-800">Sign up</h1>
-          <p className="mt-1 text-sm text-slate-500">Create your HappyBaby account.</p>
+          <p className="mt-1 text-sm text-slate-500">Create your Happy Shopping account.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>

@@ -33,7 +33,7 @@ export default function Home() {
       <main className="flex flex-1 flex-col items-center justify-center bg-slate-50 px-4 py-16 sm:px-6">
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl font-extrabold text-slate-800 sm:text-5xl">
-            Welcome to <span className="text-pink-500">Happy</span>
+            Welcome to <span className="text-pink-500">Happy Shopping</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-slate-600">
             One family of stores, three happy places. Pick where you&apos;d like to shop.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { Product, Vertical } from "../../data/products";
-import { VERTICALS, getCategoriesForVertical } from "../../data/products";
+import { VERTICALS, getCategoriesForVertical, getClothingSubcategories } from "../../data/products";
 
 type FormMode = { type: "closed" } | { type: "add" } | { type: "edit"; product: Product };
 
@@ -11,6 +11,8 @@ type FormState = {
   name: string;
   vertical: Vertical;
   category: string;
+  // Only meaningful (and only shown in the form) when category === "Clothing".
+  subcategory: string;
   price: string;
   discountPrice: string;
   description: string;
@@ -24,6 +26,7 @@ function emptyForm(): FormState {
     name: "",
     vertical: defaultVertical,
     category: getCategoriesForVertical(defaultVertical)[0].name,
+    subcategory: "",
     price: "",
     discountPrice: "",
     description: "",
@@ -38,6 +41,7 @@ function productToForm(product: Product): FormState {
     name: product.name,
     vertical: product.vertical,
     category: product.category,
+    subcategory: product.subcategory ?? "",
     price: String(hasDiscount ? product.originalPrice : product.price),
     discountPrice: hasDiscount ? String(product.price) : "",
     description: product.description,
@@ -66,6 +70,8 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const categoryOptions = getCategoriesForVertical(form.vertical);
+  const isClothing = form.category === "Clothing";
+  const subcategoryOptions = getClothingSubcategories(form.vertical);
 
   function openAddForm() {
     setForm(emptyForm());
@@ -90,6 +96,21 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
       ...f,
       vertical,
       category: getCategoriesForVertical(vertical)[0].name,
+      // The old subcategory belongs to the old vertical's list -- clear it
+      // rather than carry over a value that may not even be valid anymore.
+      subcategory: "",
+    }));
+  }
+
+  function handleCategoryChange(category: string) {
+    setForm((f) => ({
+      ...f,
+      category,
+      // Subcategory only applies to Clothing -- clear it whenever the
+      // category changes at all (including Clothing -> Clothing via a
+      // no-op select, which is harmless) so a stale value never lingers
+      // once category moves away from Clothing.
+      subcategory: category === "Clothing" ? f.subcategory : "",
     }));
   }
 
@@ -124,6 +145,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
     body.set("description", form.description.trim());
     body.set("vertical", form.vertical);
     body.set("category", form.category);
+    body.set("subcategory", isClothing ? form.subcategory : "");
     body.set("price", form.price);
     body.set("discountPrice", form.discountPrice);
     body.set("stock", form.stock);
@@ -205,7 +227,7 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
               <label className="mb-1 block text-sm font-semibold text-slate-700">Category</label>
               <select
                 value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 className="w-full rounded-full border-2 border-pink-200 px-4 py-2 text-sm text-slate-800 outline-none focus:border-pink-400"
               >
                 {categoryOptions.map((c) => (
@@ -215,6 +237,26 @@ export default function AdminPanel({ initialProducts }: { initialProducts: Produ
                 ))}
               </select>
             </div>
+
+            {isClothing && (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Subcategory (optional)
+                </label>
+                <select
+                  value={form.subcategory}
+                  onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
+                  className="w-full rounded-full border-2 border-pink-200 px-4 py-2 text-sm text-slate-800 outline-none focus:border-pink-400"
+                >
+                  <option value="">None</option>
+                  {subcategoryOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-700">Price (₹)</label>

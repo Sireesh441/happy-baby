@@ -21,6 +21,7 @@ export function toProduct(row: {
   reviewCount: number;
   tag: string | null;
   category: string;
+  subcategory?: string | null;
   vertical: string;
   emoji: string;
   color: string;
@@ -42,6 +43,7 @@ export function toProduct(row: {
     reviewCount: row.reviewCount,
     tag: (row.tag as Tag | null) ?? undefined,
     category: row.category as Category,
+    subcategory: row.subcategory ?? undefined,
     vertical: row.vertical as Vertical,
     emoji: row.emoji,
     color: row.color,
@@ -110,9 +112,18 @@ export async function getProductsByCategory(
 // shop grid picks a "default" thumbnail for a multi-color listing) plus one
 // entry per ungrouped product. `variantCount` tells the grid how many color
 // options exist so it can show a swatch/count indicator.
-export async function getGroupedProducts(vertical?: Vertical): Promise<ProductListItem[]> {
+// `subcategory` filters to that exact subcategory (meaningful for Clothing
+// products only -- passing it alongside a non-Clothing catalog just yields
+// zero results, same as any other non-matching filter).
+export async function getGroupedProducts(
+  vertical?: Vertical,
+  subcategory?: string
+): Promise<ProductListItem[]> {
   const rows = await prisma.product.findMany({
-    where: vertical ? { vertical } : undefined,
+    where: {
+      ...(vertical ? { vertical } : {}),
+      ...(subcategory ? { subcategory } : {}),
+    },
     orderBy: { id: "asc" },
   });
 
@@ -175,6 +186,9 @@ export type ProductInput = {
   price: number;
   originalPrice?: number;
   category: Category;
+  // Only persisted when category is "Clothing" -- see createProduct/
+  // updateProduct, which null it out otherwise regardless of what's passed.
+  subcategory?: string;
   vertical: Vertical;
   emoji: string;
   color: string;
@@ -191,6 +205,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       price: input.price,
       originalPrice: input.originalPrice ?? null,
       category: input.category,
+      subcategory: input.category === "Clothing" ? input.subcategory ?? null : null,
       vertical: input.vertical,
       emoji: input.emoji,
       color: input.color,
@@ -211,6 +226,7 @@ export async function updateProduct(id: number, input: ProductInput): Promise<Pr
       price: input.price,
       originalPrice: input.originalPrice ?? null,
       category: input.category,
+      subcategory: input.category === "Clothing" ? input.subcategory ?? null : null,
       vertical: input.vertical,
       emoji: input.emoji,
       color: input.color,

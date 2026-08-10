@@ -14,10 +14,10 @@ export default function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 text-center sm:px-6 md:flex-row md:justify-between md:text-left">
         <div>
           <p className="flex items-center justify-center gap-2 text-xl font-extrabold text-white md:justify-start">
-            <span aria-hidden="true">🍼</span> HappyBaby
+            <span aria-hidden="true">🛍️</span> Happy Shopping
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            Happy babies, happy families.
+            Happy shopping, happy families.
           </p>
         </div>
 
@@ -30,7 +30,7 @@ export default function Footer() {
         </nav>
 
         <p className="text-sm text-slate-400">
-          © {new Date().getFullYear()} HappyBaby. All rights reserved.
+          © {new Date().getFullYear()} Happy Shopping. All rights reserved.
         </p>
       </div>
     </footer>

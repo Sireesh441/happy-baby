@@ -42,7 +42,7 @@ export default function LoginPage() {
       <main className="flex flex-1 items-center justify-center px-4 py-16 sm:px-6">
         <div className="w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-800">Log in</h1>
-          <p className="mt-1 text-sm text-slate-500">Welcome back to HappyBaby.</p>
+          <p className="mt-1 text-sm text-slate-500">Welcome back to Happy Shopping.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>

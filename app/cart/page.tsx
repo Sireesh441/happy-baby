@@ -45,7 +45,7 @@ export default function CartPage() {
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
         order_id: razorpayOrder.orderId,
-        name: "HappyBaby",
+        name: "Happy Shopping",
         description: `Order for ${itemCount} item${itemCount > 1 ? "s" : ""}`,
         prefill: {
           name: session?.user?.name ?? undefined,

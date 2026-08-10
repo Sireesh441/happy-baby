@@ -19,7 +19,7 @@ const HERO_CONTENT: Record<Vertical, HeroContent> = {
     headingAccent: "delivered with love",
     headingSuffix: "💕",
     tagline:
-      "Diapers, feeding essentials, cozy clothing, toys, and gentle skincare — all in one happy, healthy place for you and your baby.",
+      "Cozy clothing, toys, and gentle skincare — all in one happy, healthy place for you and your baby.",
     emoji: "🧸",
     gradient: "from-pink-100 via-amber-50 to-sky-100",
     accentText: "text-pink-500",
@@ -31,7 +31,7 @@ const HERO_CONTENT: Record<Vertical, HeroContent> = {
     headingAccent: "your way",
     headingSuffix: "💪",
     tagline:
-      "Clothing, grooming, footwear, accessories, and fitness gear — everything a man needs, all in one happy place.",
+      "Clothing, footwear, and accessories — everything a man needs, all in one happy place.",
     emoji: "👔",
     gradient: "from-sky-100 via-slate-50 to-indigo-100",
     accentText: "text-sky-600",
@@ -43,7 +43,7 @@ const HERO_CONTENT: Record<Vertical, HeroContent> = {
     headingAccent: "for every day",
     headingSuffix: "💫",
     tagline:
-      "Clothing, beauty, footwear, accessories, and maternity wear — curated with care, all in one happy place.",
+      "Clothing, footwear, and accessories — curated with care, all in one happy place.",
     emoji: "👗",
     gradient: "from-violet-100 via-rose-50 to-fuchsia-100",
     accentText: "text-violet-600",

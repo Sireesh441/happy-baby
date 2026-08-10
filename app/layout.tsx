@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HappyBaby | Everything for Your Little One",
+  title: "Happy Shopping | Everything for Your Family",
   description:
-    "HappyBaby is your one-stop shop for diapers, feeding essentials, clothing, toys, and skincare for your baby.",
+    "Happy Shopping is your one-stop shop for baby essentials, men's and women's fashion, and everything in between.",
 };
 
 export default function RootLayout({
