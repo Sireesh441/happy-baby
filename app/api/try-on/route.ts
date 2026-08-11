@@ -42,7 +42,6 @@ export async function POST(request: Request) {
   }
 
   const photo = formData.get("photo");
-  const productId = Number(formData.get("productId"));
 
   if (!(photo instanceof File) || photo.size === 0) {
     return jsonResponse({ error: "Please upload a photo of yourself." }, { status: 400 });
@@ -59,38 +58,102 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!Number.isFinite(productId)) {
-    return jsonResponse({ error: "A valid productId is required." }, { status: 400 });
-  }
+  // Two request shapes: a single productId (existing single-garment flow),
+  // or upperProductId + lowerProductId together (outfit flow -- a top and
+  // a bottom composited onto the person in one call). Which one this
+  // request is depends on which field(s) are present, mirroring how
+  // tryon-service's own /api/try-on infers single vs. outfit from which
+  // image fields were uploaded.
+  const productIdRaw = formData.get("productId");
+  const upperProductIdRaw = formData.get("upperProductId");
+  const lowerProductIdRaw = formData.get("lowerProductId");
 
-  const product = await getProductById(productId);
-  if (!product) {
-    return jsonResponse({ error: "Product not found." }, { status: 404 });
-  }
+  const hasSingle = productIdRaw !== null;
+  const hasOutfit = upperProductIdRaw !== null || lowerProductIdRaw !== null;
 
-  if (!product.image) {
+  if (hasSingle && hasOutfit) {
     return jsonResponse(
-      { error: "This product doesn't have a photo available for virtual try-on yet." },
+      { error: 'Send either "productId" (single item) or both outfit product ids, not both.' },
       { status: 400 }
     );
   }
 
-  let garmentImage: Blob;
-  try {
-    garmentImage = await garmentImageBlob(product.image);
-  } catch {
-    return jsonResponse(
-      { error: "This product's image couldn't be loaded for virtual try-on." },
-      { status: 500 }
-    );
-  }
-
   const personImage = new Blob([await photo.arrayBuffer()], { type: photo.type });
-
   const tryOnForm = new FormData();
   tryOnForm.append("personImage", personImage, "photo.jpg");
-  tryOnForm.append("garmentImage", garmentImage, product.image);
-  tryOnForm.append("garmentDescription", product.name);
+
+  if (hasOutfit) {
+    const upperProductId = Number(upperProductIdRaw);
+    const lowerProductId = Number(lowerProductIdRaw);
+
+    if (!Number.isFinite(upperProductId) || !Number.isFinite(lowerProductId)) {
+      return jsonResponse(
+        { error: "A valid upperProductId and lowerProductId are both required for an outfit try-on." },
+        { status: 400 }
+      );
+    }
+
+    const [upperProduct, lowerProduct] = await Promise.all([
+      getProductById(upperProductId),
+      getProductById(lowerProductId),
+    ]);
+
+    if (!upperProduct || !lowerProduct) {
+      return jsonResponse({ error: "One of the selected products couldn't be found." }, { status: 404 });
+    }
+    if (!upperProduct.image || !lowerProduct.image) {
+      return jsonResponse(
+        { error: "One of the selected products doesn't have a photo available for virtual try-on yet." },
+        { status: 400 }
+      );
+    }
+
+    let upperGarmentImage: Blob;
+    let lowerGarmentImage: Blob;
+    try {
+      [upperGarmentImage, lowerGarmentImage] = await Promise.all([
+        garmentImageBlob(upperProduct.image),
+        garmentImageBlob(lowerProduct.image),
+      ]);
+    } catch {
+      return jsonResponse(
+        { error: "One of the selected products' images couldn't be loaded for virtual try-on." },
+        { status: 500 }
+      );
+    }
+
+    tryOnForm.append("upperGarmentImage", upperGarmentImage, upperProduct.image);
+    tryOnForm.append("lowerGarmentImage", lowerGarmentImage, lowerProduct.image);
+  } else {
+    const productId = Number(productIdRaw);
+    if (!Number.isFinite(productId)) {
+      return jsonResponse({ error: "A valid productId is required." }, { status: 400 });
+    }
+
+    const product = await getProductById(productId);
+    if (!product) {
+      return jsonResponse({ error: "Product not found." }, { status: 404 });
+    }
+    if (!product.image) {
+      return jsonResponse(
+        { error: "This product doesn't have a photo available for virtual try-on yet." },
+        { status: 400 }
+      );
+    }
+
+    let garmentImage: Blob;
+    try {
+      garmentImage = await garmentImageBlob(product.image);
+    } catch {
+      return jsonResponse(
+        { error: "This product's image couldn't be loaded for virtual try-on." },
+        { status: 500 }
+      );
+    }
+
+    tryOnForm.append("garmentImage", garmentImage, product.image);
+    tryOnForm.append("garmentDescription", product.name);
+  }
 
   try {
     const response = await fetch(`${TRYON_SERVICE_URL}/api/try-on`, {
@@ -99,6 +162,17 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json().catch(() => ({}));
+
+    // tryon-service returns 422 specifically when the provider responded
+    // but the photo itself couldn't be turned into a usable result (e.g.
+    // its NSFW-placeholder detection) -- a "pick a different photo"
+    // situation, distinct from a provider/network failure. Forward that
+    // exact message and status rather than collapsing it into the generic
+    // 502 below, so the app can show the real reason instead of a vague
+    // "something went wrong."
+    if (response.status === 422 && typeof data.error === "string") {
+      return jsonResponse({ error: data.error }, { status: 422 });
+    }
 
     if (!response.ok || typeof data.imageUrl !== "string") {
       console.error("tryon-service request failed:", response.status, data);
