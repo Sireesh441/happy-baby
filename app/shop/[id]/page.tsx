@@ -4,6 +4,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
 import AddToCartControls from "../../components/AddToCartControls";
+import TryOnPanel from "../../components/TryOnPanel";
 import { getAllProducts, getProductById } from "../../../lib/products";
 
 export default async function ProductDetailPage({
@@ -101,6 +102,12 @@ export default async function ProductDetailPage({
               <div className="mt-8">
                 <AddToCartControls product={product} />
               </div>
+
+              {product.category === "Clothing" && product.image && (
+                <div className="mt-6">
+                  <TryOnPanel productId={product.id} productName={product.name} />
+                </div>
+              )}
             </div>
           </div>
         </section>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../../lib/auth";
 import { corsPreflight, withCors } from "../../../lib/cors";
 import { getBearerToken, verifyMobileToken } from "../../../lib/mobileJwt";
 import { getProductById } from "../../../lib/products";
@@ -32,8 +34,15 @@ export async function OPTIONS() {
 export async function POST(request: Request) {
   const token = getBearerToken(request);
   const user = token ? verifyMobileToken(token) : null;
+
   if (!user) {
-    return jsonResponse({ error: "You must be logged in to use virtual try-on." }, { status: 401 });
+    // No mobile Bearer token (or an invalid one) -- fall back to the web
+    // app's own NextAuth session, so the same route serves both the
+    // mobile app and the web try-on page without duplicating this logic.
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return jsonResponse({ error: "You must be logged in to use virtual try-on." }, { status: 401 });
+    }
   }
 
   const formData = await request.formData().catch(() => null);
