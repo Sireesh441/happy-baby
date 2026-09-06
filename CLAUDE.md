@@ -7,12 +7,46 @@ Happy Shopping is a multi-vertical e-commerce platform (Kids/Men/Women, branded
 one backend, plus three standalone microservices being built to eventually
 sell as independent B2B products. This same file is kept in sync across all
 five repos so any session has the full picture regardless of which repo it
-starts in. Last updated 2026-08-21 (this repo only — see "Update history"
-below; the other four repos' sections still reflect 2026-08-09 and haven't
-been re-verified this pass).
+starts in. Last updated 2026-09-06 (all five repos re-synced this pass).
+
+## 🚨 All three Railway microservices are currently unreachable (found 2026-09-06)
+
+`happy-baby-fit-engine`, `happy-baby-returns-protection`, and
+`happy-baby-tryon-service` all returned Railway's own **"Application not
+found"** edge error when hit directly (e.g. `GET .../health`) — not a normal
+app-level 404, but Railway's proxy saying the domain no longer maps to a
+running service. All three repos also have a recent, coordinated **"Rename
+package identity from happy-baby to happy-shopping"** commit; the likely
+cause is that rename also touched the Railway services/projects, silently
+changing their auto-generated `*.up.railway.app` domains and orphaning every
+hardcoded URL pointing at the old ones (this app's `TRYON_SERVICE_URL`/
+`RETURNS_SERVICE_URL` env vars, and `happy-baby-app`'s hardcoded
+`FIT_ENGINE_URL`/`RETURNS_SERVICE_URL` constants). `happy-baby` itself
+(Vercel) is still live. **Not yet confirmed end-to-end** (no login
+credentials available to drive it from this pass) whether `/api/try-on`,
+`/admin/returns`, and the mobile app's fit-score/return-case flows are
+actually broken in production as a result — but given the evidence, they
+very likely are. **First thing to do next session: check the Railway
+dashboard for these three services' real current URLs and re-point every
+reference to them.**
 
 ## Update history
 
+- **2026-09-06**: Re-synced all five repos' `CLAUDE.md` files together in one
+  pass (previously only this repo had been re-synced, on 2026-08-21).
+  Highlights: discovered the Railway outage above; fit-engine renamed
+  `FamilyProfile` → `PersonProfile` and added photo upload; returns-protection
+  and tryon-service both got the `happy-shopping` package rename;
+  tryon-service's `SelfHostedProvider` is no longer a stub — it now calls a
+  real RunPod-hosted CatVTON server with outfit-mode and NSFW-placeholder
+  detection, though the default `PROVIDER` is still `huggingface`, which
+  explicitly throws on outfit requests; `happy-baby-app` shipped 5 more
+  commits (swatch-switching UI, wholesale/bulk-buying UI, expandable
+  subcategory rail, full-outfit try-on mode, WhatsApp share for try-on
+  results) plus a same-day fix for product photos not rendering correctly;
+  this repo got a `.env.example` (real secrets were almost committed to git
+  — GitHub's push protection caught a live Anthropic API key and blocked it,
+  which is why `.env.example` now exists instead).
 - **2026-08-21**: Re-synced this section against `happy-baby`'s actual repo
   state (git log + source read directly, not assumed from the prior entry).
   Six commits had landed since the 2026-08-09 sync (`581a79e`) that weren't
@@ -21,9 +55,7 @@ been re-verified this pass).
   import support for both, clothing subcategories + a new `/api/categories`
   endpoint, outfit (upper+lower) try-on support in `/api/try-on`, and a web
   try-on UI (`TryOnPanel.tsx`, branded Share/Download). See the expanded
-  "1. happy-baby" section below for details. The other four repos were not
-  re-checked this pass — their sections may now be stale the same way this
-  one was.
+  "1. happy-baby" section below for details.
 
 **You are here:** `happy-baby` — the Next.js web app + core backend, the
 most mature and only currently-deployed repo. See its detailed section
@@ -98,11 +130,11 @@ is the clearest open security gap across all five repos right now.
 
 | # | Repo | Role | Status |
 |---|------|------|--------|
-| 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature; as of 2026-08-21 also has product variant grouping, wholesale/bulk pricing, clothing subcategories, and outfit try-on (see detail section) |
-| 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Live end-to-end walkthrough completed: auth, cart, checkout/Razorpay, try-on, fit-engine, returns-protection all confirmed working from the app |
-| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Family Fit Profiles + Fit Confidence Score | Deployed live on Railway, confirmed wired into the mobile app (`/api/family-profiles`, `/api/fit-score` both hit live) |
-| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | Deployed live on Railway, Cloudinary-backed proof uploads, wired into both the mobile app (create case + upload unboxing proof) and this repo's `/admin/returns` panel |
-| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | Deployed live on Railway, confirmed as the real production try-on path via this repo's `/api/try-on` |
+| 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature; has product variant grouping, wholesale/bulk pricing, clothing subcategories, and outfit try-on (see detail section) |
+| 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Feature-complete matching this repo's backend (swatches, bulk-buying, subcategory rail, outfit try-on, WhatsApp share); image-rendering bugs fixed 2026-09-06 |
+| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Person Fit Profiles + Fit Confidence Score | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Renamed `FamilyProfile`→`PersonProfile`, added photo upload |
+| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Otherwise feature-complete per last verification (Cloudinary uploads, admin panel wiring) |
+| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Self-hosted CatVTON provider now implemented (outfit mode + NSFW detection); still no JWT auth |
 
 ## Key product strategy — "Fit Certain"
 
@@ -183,6 +215,34 @@ other e-commerce brands once proven inside Happy Shopping.
     signed-up user, real product, real photo): this app's production
     `/api/try-on` → the Railway tryon-service → the live `yisol/IDM-VTON`
     Gradio Space → back, ~23s, correctly shaped `{ imageUrl }` response.
+  - **Status as of 2026-09-06: this whole chain is presumed broken** — see
+    the Railway-outage banner at the top of this file. `TRYON_SERVICE_URL`
+    almost certainly still points at the old, now-dead Railway domain.
+- **Package rename across the three microservices**: `happy-baby-fit-engine`,
+  `happy-baby-returns-protection`, and `happy-baby-tryon-service` each have a
+  recent "Rename package identity from happy-baby to happy-shopping" commit.
+  This app's own `package.json`/branding was not part of that rename (not
+  checked whether it should be for consistency).
+- **fit-engine's `FamilyProfile` model was renamed to `PersonProfile`**
+  (broadens the concept beyond just "family"). **Not verified this pass**:
+  whether `happy-baby-app`'s UI copy/routes (`family-members`, "Family Fit
+  Profiles") or this repo's own product-strategy language were updated to
+  match, or whether this is purely a backend/schema rename so far.
+- **Outfit try-on requires `PROVIDER=self-hosted` on tryon-service.**
+  tryon-service's `HuggingFaceProvider` (the default) explicitly throws for
+  outfit (upper+lower) requests — only the newer `SelfHostedProvider` (a real
+  RunPod-hosted CatVTON server, no longer a stub) supports them. This app's
+  `/api/try-on` already ships the outfit code path, and `happy-baby-app`
+  already calls it. Whether Railway's `PROVIDER` env var is actually set to
+  `self-hosted` could not be confirmed this pass (service unreachable — see
+  banner above); if it isn't, every outfit try-on request fails outright.
+- **Never commit real `.env`/`.env.local` files.** This repo's actual
+  `.env.local` was briefly committed locally (never pushed) and GitHub's
+  push-protection immediately flagged a live Anthropic API key inside it —
+  confirming this isn't just theoretical risk. Use `.env.example` (variable
+  names only) for documenting required config instead; real values live in
+  Vercel's/Railway's dashboards and are recoverable from there on any
+  machine (`vercel env pull .env.local` for this repo).
 
 ## Known technical decisions/gotchas (apply project-wide)
 
@@ -365,17 +425,29 @@ first one, and generating both on every Vercel build would be wasted work.
 ### 2. happy-baby-app (mobile — use the **inner** `happy-baby-app\happy-baby-app\` copy)
 
 Expo SDK 54, targeting native (iOS/Android) and web from one codebase.
-Per its own `CLAUDE.md` (also synced to 2026-08-09) and cross-checked
-against this repo: HEAD commit is `Add return flow to Order History: create
-case + unboxing proof upload`, on top of earlier commits adding Family Fit
-Profiles, checkout, and try-on. Two more fixes were made and verified live
-today but were **not yet committed** as of that repo's last sync: (1)
-checkout now branches on `Platform.OS` so web purchases work too (native
-keeps the Razorpay WebView flow; web loads Razorpay's `checkout.js` script
-directly via a new `src/lib/razorpay-web.ts`, since `react-native-webview`
-has no web implementation at all), and (2) the post-login redirect fallback
-was changed from `router.back()` (which silently no-ops with no prior nav
-history) to `router.replace('/')`.
+Git log now at 22 commits, latest `f36819f` "Show real product photos
+instead of emoji, fix cropped detail-page images" (2026-09-06, see below).
+Six commits landed since the 2026-08-09 sync (`e2720fe`, return flow to
+Order History): Day 30 swatch-switching UI (shop grid + product detail, for
+this repo's variant-grouping feature), Day 32b wholesale/bulk-buying UI
+(toggle, pack picker, cart/checkout/history), an expandable Clothing
+subcategory rail, full-outfit try-on mode (`src/lib/try-on-api.ts` sends
+`upperProductId`+`lowerProductId` — see the outfit-try-on/`PROVIDER` note
+above), WhatsApp share for try-on results (single + batch, worked around a
+`react-native-view-shot` web bug by using `html2canvas` directly), and
+today's image-rendering fix.
+
+**Bugs fixed 2026-09-06 (commit `f36819f`):** `ProductThumbnail` (used in
+the shop grid, cart, wishlist, order history, and try-on picker) always
+rendered the emoji placeholder and never checked `product.image`, even for
+products with a real photo URL from the backend — fixed to resolve and
+render the real image via the existing `getProductImageUrl()` helper,
+falling back to the emoji only when a product genuinely has none.
+`ProductImageCarousel` (product detail page) used `resizeMode="cover"` in a
+fixed-height box, badly cropping/zooming portrait product photos — fixed to
+`resizeMode="contain"` with a tile-color background fill so the whole photo
+is always visible (letterboxed, not cropped). Both verified live in a local
+`expo start --web` session before committing.
 
 Screens (`src/app/`): tabs home, shop by vertical, product detail, cart,
 account, wishlist, login/signup, checkout, razorpay-checkout (WebView,
@@ -384,20 +456,21 @@ assistant. Client libs (`src/lib/`) include `fit-engine-api.ts` and
 `returns-api.ts`, both hardcoding their respective Railway production URLs
 as constants rather than reading an env var — a deliberate choice made to
 avoid repeating the kind of localhost-fallback bug this app's own
-`TRYON_SERVICE_URL` had.
+`TRYON_SERVICE_URL` had. **As of 2026-09-06 those hardcoded Railway URLs are
+presumed dead** — see the Railway-outage banner at the top of this file;
+fit-engine and returns-protection features in this app are likely broken
+until those URLs are fixed.
 
-**Confirmed live end-to-end today (2026-08-09)** per that repo's own notes:
-signup/login against this app's production backend; full checkout +
-Razorpay payment + order confirmation on both native and the newly-fixed
-web path; Family Fit Profiles (create a family member, see a "100% match"
-Fit Confidence Score on a product page via fit-engine); initiating a return
-and uploading unboxing proof against returns-protection, with Order History
-correctly reflecting status ("Proof Pending" / "Proof uploaded ✓"). Try-on
+**Confirmed live end-to-end as of 2026-08-09** (not re-verified this pass
+beyond reading the source and git log): signup/login against this app's
+production backend; full checkout + Razorpay payment + order confirmation
+on both native and web; Family Fit Profiles (create a family member, see a
+"100% match" Fit Confidence Score on a product page via fit-engine);
+initiating a return and uploading unboxing proof against
+returns-protection, with Order History correctly reflecting status. Try-on
 is live with a known accepted bug (garment type sometimes misclassified,
-e.g. jeans rendered as a shirt) and **still calls this app's own
-`/api/try-on`** rather than `happy-baby-tryon-service` directly — since
-this app's `/api/try-on` now proxies to tryon-service itself, the mobile
-app reaches tryon-service transitively, not via a direct call.
+e.g. jeans rendered as a shirt) and calls this app's own `/api/try-on`,
+which proxies to `happy-baby-tryon-service`.
 
 ### 3. happy-baby-fit-engine
 
@@ -405,13 +478,21 @@ Express + TypeScript. Owns Family Fit Profiles and Fit Confidence Score.
 Shares this app's Supabase database, isolated via `fit_`-prefixed tables
 only (no separate Postgres schema — see "Cross-repo integration facts").
 
-**Committed (7 commits through `60e651c`, clean working tree), pushed to
-GitHub, and deployed live on Railway**
+**Committed (11 commits, clean working tree), pushed to GitHub.** Two new
+commits since the 2026-08-09 sync: `FamilyProfile` renamed to
+`PersonProfile` (broadens the concept beyond just "family" — **not verified
+whether `happy-baby-app`'s "Family Fit Profiles" UI copy/routes or this
+app's own product-strategy language were updated to match**), and photo
+upload added for `PersonProfile`. Also renamed package identity from
+`happy-baby` to `happy-shopping`, alongside returns-protection and
+tryon-service. 🚨 **Its Railway URL
 (`https://happy-baby-fit-engine-production.up.railway.app`, project
-`amused-wisdom`, shared with returns-protection). The earlier
-`node dist/index.js` production crash is fixed (switched from the
-`prisma-client` generator to `prisma-client-js`) — confirmed still holding
-as of 2026-08-09. Verified live with real HTTP requests against the real
+`amused-wisdom`, shared with returns-protection) returned "Application not
+found" when hit directly on 2026-09-06** — see the banner at the top of
+this file; not yet fixed. The earlier `node dist/index.js` production crash
+fix (switched from the `prisma-client` generator to `prisma-client-js`) is
+presumed still in the code but couldn't be re-confirmed live given the
+outage. Previously verified live with real HTTP requests against the real
 Supabase database, including from the live mobile app:
 
 - `POST /api/family-profiles`, `GET /api/family-profiles`,
@@ -439,11 +520,16 @@ Express + TypeScript. Handles tamper-evident return proof. Shares this
 app's Supabase database, isolated via **both** `returns_`-prefixed tables
 and its own Postgres schema (`returns_protection`).
 
-**Committed, pushed to GitHub, and deployed live on Railway**
+**Committed, pushed to GitHub.** Package identity renamed from `happy-baby`
+to `happy-shopping`, alongside fit-engine and tryon-service — otherwise
+functionally unchanged since the last sync. 🚨 **Its Railway URL
 (`https://happy-baby-returns-protection-production.up.railway.app`, project
-`amused-wisdom`, shared with fit-engine). The `node dist/index.js`
-production crash is fixed (same `prisma-client-js` switch as fit-engine).
-Verified live end-to-end against the real shared Supabase database:
+`amused-wisdom`, shared with fit-engine) returned "Application not found"
+when hit directly on 2026-09-06** — see the banner at the top of this file;
+not yet fixed. The `node dist/index.js` production crash fix (same
+`prisma-client-js` switch as fit-engine) is presumed still in the code but
+couldn't be re-confirmed live given the outage. Previously verified live
+end-to-end against the real shared Supabase database:
 
 - `POST /api/return-cases` (creates a case linked to `orderId`/`itemId`;
   open to any authenticated user, not admin-only — changed from earlier
@@ -479,85 +565,84 @@ model logic, just routes to whichever provider `PROVIDER` selects. Lives
 under plain `Desktop\happy-baby-tryon-service\`, not
 `OneDrive - RiskSpan\Desktop\` like the other four repos.
 
-- `POST /api/try-on` (multipart `personImage` + `garmentImage`) → forwards
-  to the active provider adapter, returns `{ imageUrl }`. `HuggingFaceProvider`
+- `POST /api/try-on` (multipart `personImage` + `garmentImage`, or
+  `upperGarmentImage` + `lowerGarmentImage` for outfit mode) → forwards to
+  the active provider adapter, returns `{ imageUrl }`. `HuggingFaceProvider`
   talks to a Gradio Space (not a REST endpoint — free HF Spaces don't have
   one) via `@gradio/client`, configured with `HUGGINGFACE_SPACE` (not
   `HUGGINGFACE_ENDPOINT_URL`, the old, wrong design), defaulting to
-  `yisol/IDM-VTON`; `SelfHostedProvider` stubbed for a future GPU server.
-  `GET /health` → `{ status, provider }`.
-- **Deployed live on Railway**
-  (`https://happy-baby-tryon-service-production.up.railway.app`, its own
-  project `laudable-charm`, separate from fit-engine/returns-protection's
-  shared project) and **confirmed to be the real production try-on path**
-  — hitting `/health` directly returns `{"status":"ok","provider":
-  "huggingface"}`, confirming the live deployment runs current code, not a
-  stale build. See "Cross-repo integration facts" above for the full story
-  of what was broken (stale deployed code + a placeholder
-  `TRYON_SERVICE_URL` on Vercel) and how it got fixed on 2026-08-07.
+  `yisol/IDM-VTON` — **but throws an explicit error for outfit requests**
+  ("outfit (upper + lower) requests need PROVIDER=self-hosted"). `GET
+  /health` → `{ status, provider }`.
+- **`SelfHostedProvider` is no longer a stub** (confirmed by reading
+  `src/providers/selfHosted.ts` directly) — it now calls a real
+  **RunPod-hosted CatVTON FastAPI server** via `SELF_HOSTED_ENDPOINT_URL`
+  (no default; must point at a real running server), supports outfit mode,
+  and detects CatVTON's own NSFW-classifier false-positives by SHA-256
+  hash-matching its response bytes against a known static placeholder image
+  (the classifier returns a normal 200 with no error field when it
+  false-positives, so there's no other signal to detect it by).
+- **Package identity renamed from `happy-baby` to `happy-shopping`.**
+- Default `PROVIDER` env var is still `huggingface` — confirming whether
+  Railway's `PROVIDER` is actually set to `self-hosted` (required for the
+  outfit try-on feature `happy-baby`/`happy-baby-app` already ship) was not
+  possible this pass; see below.
+- 🚨 **This service's Railway URL
+  (`https://happy-baby-tryon-service-production.up.railway.app`) returned
+  "Application not found" when hit directly on 2026-09-06** — the live
+  deployment appears to be gone or renamed, likely related to the package
+  rename above touching the Railway service itself. Not yet fixed. See the
+  banner at the top of this file.
 - No `railway.json`/`Procfile`/`nixpacks.toml` is committed anywhere — the
-  live deployment's build/start commands, domain, and env vars
-  (`HUGGINGFACE_API_KEY`, `HUGGINGFACE_SPACE`, `ALLOWED_ORIGINS`, `PORT`)
-  only exist in Railway's dashboard, not as version-controlled config.
-- **Still has no authentication on `POST /api/try-on`** — see the
-  "Worth reconsidering" note above; this is the most concrete open risk
-  across all five repos right now given it's confirmed live in production.
-- **Not verified this pass (flagging, not confirming a break):** as of
-  2026-08-21, `happy-baby`'s `/api/try-on` added an outfit flow that posts
-  `upperGarmentImage` + `lowerGarmentImage` (instead of a single
-  `garmentImage`) to this service. This repo's own description above only
-  documents a single-`garmentImage` request shape — whether tryon-service
-  actually has a matching outfit code path was not checked in this pass
-  (only `happy-baby` was re-verified). Worth confirming next time this repo
-  is opened, since if it doesn't, every outfit try-on request is currently
-  failing in production.
+  (now-unreachable) deployment's build/start commands, domain, and env vars
+  (`HUGGINGFACE_API_KEY`, `HUGGINGFACE_SPACE`, `SELF_HOSTED_ENDPOINT_URL`,
+  `ALLOWED_ORIGINS`, `PORT`, `PROVIDER`) only ever existed in Railway's
+  dashboard, not as version-controlled config — this makes diagnosing/
+  redeploying after the outage above harder than it needed to be.
+- **Still has no authentication on `POST /api/try-on`** — confirmed again by
+  reading `src/middleware/` (only `errorHandler.ts` exists, no JWT check
+  anywhere). This has been the single most-repeated open item across every
+  sync of this file for weeks; still not fixed. Once real, real-money
+  RunPod/Hugging Face inference is running again post-outage, every
+  unauthenticated caller can trigger it.
 
 ---
 
 ## Immediate next steps
 
-All items from the previous update (mobile checkout verification,
-committing fit-engine's CRUD work, deploying all three microservices, and
-wiring them into the main app/mobile app) are now done — see "Status as of
-2026-08-09" and the per-repo sections above. What's actually open now:
-
-1. **`happy-baby` (this repo) has local, uncommitted/unpushed state as of
-   2026-08-21**: one local commit (`9504bed`) ahead of `origin/master`, not
-   yet pushed; and an unstaged fix to `scripts/import-products.js` (picks
-   the worksheet by name, `"Products"`, instead of always grabbing
-   `worksheets[0]` — the Excel template ships with an "Instructions" tab
-   first, so index-0 was silently reading the wrong sheet). Push the commit
-   and decide on/commit the worksheet fix.
-2. **Verify tryon-service actually supports the new outfit request shape**
-   (`upperGarmentImage` + `lowerGarmentImage`) — see the flag at the end of
-   the tryon-service section above. Not checked this pass.
+1. 🚨 **Diagnose and fix the Railway outage** — check the Railway dashboard
+   for fit-engine's, returns-protection's, and tryon-service's actual
+   current service URLs, then re-point `TRYON_SERVICE_URL`/
+   `RETURNS_SERVICE_URL` (this repo's Vercel env vars) and
+   `happy-baby-app`'s hardcoded `FIT_ENGINE_URL`/`RETURNS_SERVICE_URL`
+   constants at whatever the real URLs turn out to be. This is now the
+   single biggest blocker across the whole platform.
+2. **Confirm `PROVIDER=self-hosted` is actually set on tryon-service**
+   once it's reachable again — otherwise every outfit try-on request (a
+   feature already shipped in both this repo and the mobile app) fails
+   outright against the default `huggingface` provider, which explicitly
+   rejects outfit requests.
 3. **Add JWT auth to `happy-baby-tryon-service`'s `POST /api/try-on`** —
-   the clearest concrete open item. It's confirmed to be the live
-   production try-on path with zero auth, meaning every unauthenticated
-   caller can trigger real paid inference. Should verify the same Bearer
-   JWT this app already issues, consistent with fit-engine and
-   returns-protection.
-4. `happy-baby-app`: commit the two 2026-08-09 fixes made and verified live
-   but not yet committed as of that repo's last sync — the web-checkout
-   `Platform.OS` branch and the `router.replace('/')` login-redirect fix.
-   Also worth a fresh re-sync now that the mobile app hasn't been re-checked
-   since 2026-08-09 (see "Update history" at the top of this file) — it may
-   need `/api/categories` and variant/bulk-pack support added to keep up
-   with this repo's new features.
+   still the clearest concrete open security item, unaddressed for weeks.
+   Should verify the same Bearer JWT this app already issues, consistent
+   with fit-engine and returns-protection.
+4. Confirm whether fit-engine's `FamilyProfile`→`PersonProfile` rename
+   needs any corresponding update in this repo or `happy-baby-app` (UI
+   copy, route names) — not checked this pass.
 5. Decide whether/how this app's product catalog should expose real
    per-product size charts for fit-engine to consume — fit-engine's
    `/api/fit-score` still requires the caller to pass one in, and the
    mobile app currently works around this with a generic per-vertical
    chart rather than real product data.
 6. returns-protection: decide whether return-case status should
-   auto-transition based on proof completeness, or stay fully manual (the
-   previously-open orphaned-file bug is already fixed).
+   auto-transition based on proof completeness, or stay fully manual.
 7. Consider removing the now-vestigial `FAL_API_KEY`/`HF_TOKEN` Vercel env
    vars on this project — nothing in `app/` or `lib/` references them
    anymore now that `/api/try-on` just proxies to `TRYON_SERVICE_URL`.
-8. Consider committing tryon-service's Railway deploy config
-   (build/start commands, domain, env var names) — currently only exists
-   in Railway's dashboard with nothing version-controlled to reproduce it.
+8. Consider committing IaC/deploy config for all three Railway services
+   (build/start commands, domain, env var names) — none of it is
+   version-controlled today, which made the outage above harder to
+   diagnose and will make it harder to reproduce a fix.
 9. Consider cleaning up the outer, near-empty `happy-baby-app\` template
    shell so the nested-repo trap described above doesn't cause confusion
    later (not touched yet — flagging only, across all repos).
