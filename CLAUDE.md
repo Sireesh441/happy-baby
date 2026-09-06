@@ -7,7 +7,23 @@ Happy Shopping is a multi-vertical e-commerce platform (Kids/Men/Women, branded
 one backend, plus three standalone microservices being built to eventually
 sell as independent B2B products. This same file is kept in sync across all
 five repos so any session has the full picture regardless of which repo it
-starts in. Last updated 2026-08-09.
+starts in. Last updated 2026-08-21 (this repo only — see "Update history"
+below; the other four repos' sections still reflect 2026-08-09 and haven't
+been re-verified this pass).
+
+## Update history
+
+- **2026-08-21**: Re-synced this section against `happy-baby`'s actual repo
+  state (git log + source read directly, not assumed from the prior entry).
+  Six commits had landed since the 2026-08-09 sync (`581a79e`) that weren't
+  reflected here: product variant grouping (`ProductGroup`, Amazon-style
+  color swatches), wholesale/bulk-pack pricing and cart support, Excel
+  import support for both, clothing subcategories + a new `/api/categories`
+  endpoint, outfit (upper+lower) try-on support in `/api/try-on`, and a web
+  try-on UI (`TryOnPanel.tsx`, branded Share/Download). See the expanded
+  "1. happy-baby" section below for details. The other four repos were not
+  re-checked this pass — their sections may now be stale the same way this
+  one was.
 
 **You are here:** `happy-baby` — the Next.js web app + core backend, the
 most mature and only currently-deployed repo. See its detailed section
@@ -82,7 +98,7 @@ is the clearest open security gap across all five repos right now.
 
 | # | Repo | Role | Status |
 |---|------|------|--------|
-| 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature |
+| 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature; as of 2026-08-21 also has product variant grouping, wholesale/bulk pricing, clothing subcategories, and outfit try-on (see detail section) |
 | 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Live end-to-end walkthrough completed: auth, cart, checkout/Razorpay, try-on, fit-engine, returns-protection all confirmed working from the app |
 | 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Family Fit Profiles + Fit Confidence Score | Deployed live on Railway, confirmed wired into the mobile app (`/api/family-profiles`, `/api/fit-score` both hit live) |
 | 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | Deployed live on Railway, Cloudinary-backed proof uploads, wired into both the mobile app (create case + upload unboxing proof) and this repo's `/admin/returns` panel |
@@ -219,20 +235,91 @@ custom JWT endpoints (`/api/mobile-auth/login`, `/signup`, `/me`) for the
 mobile app (signing/verification in `lib/mobileJwt.ts` — payload is exactly
 `{ sub, name, email }`, 30-day expiry, nothing else — no `isAdmin` claim).
 Razorpay payments. Anthropic-powered "Ask Happy Shopping" assistant. Cloudinary
-for image hosting (product-import pipeline). Confirmed via a live
-production walkthrough today (signup, login, mobile-auth, products, cart,
+for image hosting (product-import pipeline). Confirmed as of 2026-08-09 via
+a live production walkthrough (signup, login, mobile-auth, products, cart,
 orders, and a real Razorpay test-mode payment with real signature
-verification) plus direct reading of the source, git log (26 commits,
-latest `581a79e` "Add admin Returns panel", 2026-08-08), and the actual
-route listing under `app/api/`:
+verification); the 2026-08-21 update below is from direct source reading
+only (git log + reading the actual files), not a fresh production
+walkthrough — worth re-verifying live if picking this up.
+
+Git log now at 32 commits, latest `9504bed` "Add web try-on flow with
+branded Share/Download". Six commits landed between the 2026-08-09 sync
+(`581a79e`, admin Returns panel) and now, in order: product variant
+grouping (`c369db8`), wholesale/bulk-pack backend (`a97ef17`), Excel import
+support for variant grouping (`37f4754`), clothing subcategories +
+`/api/categories` (`0f64841`), outfit try-on support (`72b358d`), and the
+web try-on UI (`9504bed`). Actual route listing under `app/api/`:
 
 `addresses`, `admin/return-cases/[id]/status`, `assistant`,
-`auth/[...nextauth]`, `cart`, `cart/[productId]`, `mobile-auth/login`,
-`mobile-auth/me`, `mobile-auth/signup`, `orders`, `orders/[id]`, `products`,
-`products/[id]`, `razorpay/create-order`, `signup`, `try-on`. (The
-`admin/return-cases/[id]/status` route is new since the last update — it's
+`auth/[...nextauth]`, `cart`, `cart/[productId]`, `cart/item/[id]`,
+`categories`, `mobile-auth/login`, `mobile-auth/me`, `mobile-auth/signup`,
+`orders`, `orders/[id]`, `products`, `products/[id]`, `products/group/[id]`,
+`razorpay/create-order`, `signup`, `try-on`. New since the last sync:
+`cart/item/[id]` (removes a cart line by its own row id — the only way to
+remove a bulk-pack line, which has no single `productId` to key off of),
+`categories` (public, CORS-open listing of a vertical's categories +
+Clothing subcategories, for the mobile app's shop screen), and
+`products/group/[id]` (returns every color variant in a `ProductGroup`, for
+a product-detail page's swatch picker — `GET /api/products` only returns
+one representative variant per group). `admin/return-cases/[id]/status` is
 this app's server-side proxy for the admin Returns panel, not a route
-returns-protection itself exposes to browsers.)
+returns-protection itself exposes to browsers.
+
+**New features since 2026-08-09:**
+
+- **Product variant grouping** (`c369db8`, Day 29–30): Amazon-style color
+  swatches under one listing. New `ProductGroup` model owns the shared
+  listing info (name/vertical/category/description); `Product` gets a
+  nullable `productGroupId` + `variantColor` (the actual physical color,
+  distinct from the pre-existing `color` field, which is a Tailwind class
+  used for card-background theming, not a real color — kept as-is rather
+  than renamed to avoid touching every styling call site). Nullable/backward
+  compatible — most existing products predate grouping and stay ungrouped
+  ("a group of one"). `scripts/group-product-variants.ts` backfills groups
+  by name-matching existing products.
+- **Wholesale/bulk-pack pricing** (`a97ef17`, Day 31): a cart line can now be
+  a "pack" (5 or 10 units) drawn from multiple variants in one
+  `ProductGroup`, priced via `lib/bulkPricing.ts` — an explicit per-pack-size
+  override on `ProductGroup.bulkPricing` wins, otherwise a computed default
+  (~15% off for a 5-pack, ~20% off for a 10-pack, off the group's
+  representative variant price). `CartItem` gained four nullable columns
+  (`productGroupId`, `packSize`, `bulkBreakdown` JSON, `bulkPricePerUnit` —
+  the last one a price snapshot at add-time so a later `bulkPricing` change
+  doesn't retroactively reprice an item already in a cart) used together for
+  a bulk line and left null for a normal single-product line.
+- **Clothing subcategories + `/api/categories`** (`0f64841`): `Product`
+  gained a nullable `subcategory` column (only meaningful when
+  `category === "Clothing"`; allowed values per vertical live in
+  `CLOTHING_SUBCATEGORIES` in `app/data/products.ts`). The new endpoint
+  exposes category (and, for Clothing, subcategory) listings per vertical so
+  the mobile app doesn't have to duplicate that config.
+- **Outfit try-on** (`72b358d`): `/api/try-on` now accepts either a single
+  `productId` (existing flow) or `upperProductId` + `lowerProductId`
+  together, compositing a top and bottom onto one photo in one call —
+  mirrors how tryon-service itself infers single-vs-outfit from which image
+  fields are present. Also now forwards tryon-service's `422` status
+  verbatim (provider responded but the photo itself was unusable, e.g. an
+  NSFW-placeholder result) instead of collapsing it into a generic 502, and
+  **`/api/try-on` now accepts a web NextAuth session as an alternative to
+  the mobile Bearer JWT** (falls back to `getServerSession` when no valid
+  JWT is present) — needed for the new web UI below, which has no JWT of
+  its own. **No web UI calls the outfit path yet** — `TryOnPanel.tsx` (see
+  next item) only ever sends a single `productId`; outfit try-on is
+  currently API-only, presumably built ahead of a UI or for the mobile app.
+- **Web try-on UI** (`9504bed`): `app/components/TryOnPanel.tsx`, a
+  client component (upload photo → poll → show result) rendered on the
+  product detail page, gated behind a NextAuth session (shows a "Log in to
+  try this on" prompt otherwise). Result image gets a branded pink
+  "Try it on Happy Shopping" footer composited on via `lib/shareTryOnImage.ts`
+  before Share (Web Share API with file support, `supportsFileShare()`) or
+  Download (`shareOrDownloadUrl` fallback) — compositing is skipped and it
+  falls back to a plain share/download of the raw image if the result host
+  doesn't allow cross-origin byte fetches for canvas compositing.
+- **`product-import/`** — a new top-level folder (`images/` + `products.xlsx`)
+  holding the actual Excel catalog + photos that `scripts/import-products.js`
+  reads, alongside `scripts/backfill-subcategories.js` and
+  `scripts/group-product-variants.ts` as one-off backfill scripts for the
+  two features above.
 
 **Admin auth** (`lib/admin.ts`): a single hardcoded allowlisted email,
 `isAdminEmail()` does a case-insensitive compare against
@@ -250,12 +337,21 @@ data used to enrich each case (product/customer info) is looked up locally
 via `lib/orders.ts` since returns-protection only knows raw
 `orderId`/`itemId` numbers.
 
-**Prisma schema** (`prisma/schema.prisma`) — 5 models, all in the `public`
+**Prisma schema** (`prisma/schema.prisma`) — 6 models, all in the `public`
 schema: `User` (`users`), `Address` (`addresses`), `Product` (`products`,
 with a `sizes` JSON column for per-size stock breakdown from the catalog
-import, `vertical` enum `kids|men|women`, and `garmentRegion` enum
+import, `vertical` enum `kids|men|women`, `garmentRegion` enum
 `upper_body|lower_body|dresses` used to gate which products support virtual
-try-on), `CartItem` (`cart_items`), `Order` (`orders`, storing
+try-on, a nullable `subcategory` string meaningful only for Clothing, and
+— new as of 2026-08-21 — a nullable `productGroupId` FK + `variantColor`
+for variant grouping), `ProductGroup` (`product_groups`, **new**: the
+shared listing info across an item's color variants, holding `bulkPricing`
+JSON for wholesale overrides and a unique `sku` so the Excel import can
+find/update the same group across re-runs instead of duplicating it),
+`CartItem` (`cart_items`, **extended**: `productId` is now nullable and
+four new nullable columns — `productGroupId`, `packSize`, `bulkBreakdown`
+JSON, `bulkPricePerUnit` — carry a bulk-pack line, which has no single
+product of its own), `Order` (`orders`, storing
 `razorpayOrderId`/`razorpayPaymentId`/`items`/`shippingAddress` as JSON
 rather than normalized line-item tables). Two Prisma generators are
 configured: the main `client` generator (modern `prisma-client` output used
@@ -406,6 +502,15 @@ under plain `Desktop\happy-baby-tryon-service\`, not
 - **Still has no authentication on `POST /api/try-on`** — see the
   "Worth reconsidering" note above; this is the most concrete open risk
   across all five repos right now given it's confirmed live in production.
+- **Not verified this pass (flagging, not confirming a break):** as of
+  2026-08-21, `happy-baby`'s `/api/try-on` added an outfit flow that posts
+  `upperGarmentImage` + `lowerGarmentImage` (instead of a single
+  `garmentImage`) to this service. This repo's own description above only
+  documents a single-`garmentImage` request shape — whether tryon-service
+  actually has a matching outfit code path was not checked in this pass
+  (only `happy-baby` was re-verified). Worth confirming next time this repo
+  is opened, since if it doesn't, every outfit try-on request is currently
+  failing in production.
 
 ---
 
@@ -416,29 +521,43 @@ committing fit-engine's CRUD work, deploying all three microservices, and
 wiring them into the main app/mobile app) are now done — see "Status as of
 2026-08-09" and the per-repo sections above. What's actually open now:
 
-1. **Add JWT auth to `happy-baby-tryon-service`'s `POST /api/try-on`** —
+1. **`happy-baby` (this repo) has local, uncommitted/unpushed state as of
+   2026-08-21**: one local commit (`9504bed`) ahead of `origin/master`, not
+   yet pushed; and an unstaged fix to `scripts/import-products.js` (picks
+   the worksheet by name, `"Products"`, instead of always grabbing
+   `worksheets[0]` — the Excel template ships with an "Instructions" tab
+   first, so index-0 was silently reading the wrong sheet). Push the commit
+   and decide on/commit the worksheet fix.
+2. **Verify tryon-service actually supports the new outfit request shape**
+   (`upperGarmentImage` + `lowerGarmentImage`) — see the flag at the end of
+   the tryon-service section above. Not checked this pass.
+3. **Add JWT auth to `happy-baby-tryon-service`'s `POST /api/try-on`** —
    the clearest concrete open item. It's confirmed to be the live
    production try-on path with zero auth, meaning every unauthenticated
    caller can trigger real paid inference. Should verify the same Bearer
    JWT this app already issues, consistent with fit-engine and
    returns-protection.
-2. `happy-baby-app`: commit the two 2026-08-09 fixes made and verified live
+4. `happy-baby-app`: commit the two 2026-08-09 fixes made and verified live
    but not yet committed as of that repo's last sync — the web-checkout
    `Platform.OS` branch and the `router.replace('/')` login-redirect fix.
-3. Decide whether/how this app's product catalog should expose real
+   Also worth a fresh re-sync now that the mobile app hasn't been re-checked
+   since 2026-08-09 (see "Update history" at the top of this file) — it may
+   need `/api/categories` and variant/bulk-pack support added to keep up
+   with this repo's new features.
+5. Decide whether/how this app's product catalog should expose real
    per-product size charts for fit-engine to consume — fit-engine's
    `/api/fit-score` still requires the caller to pass one in, and the
    mobile app currently works around this with a generic per-vertical
    chart rather than real product data.
-4. returns-protection: decide whether return-case status should
+6. returns-protection: decide whether return-case status should
    auto-transition based on proof completeness, or stay fully manual (the
    previously-open orphaned-file bug is already fixed).
-5. Consider removing the now-vestigial `FAL_API_KEY`/`HF_TOKEN` Vercel env
+7. Consider removing the now-vestigial `FAL_API_KEY`/`HF_TOKEN` Vercel env
    vars on this project — nothing in `app/` or `lib/` references them
    anymore now that `/api/try-on` just proxies to `TRYON_SERVICE_URL`.
-6. Consider committing tryon-service's Railway deploy config
+8. Consider committing tryon-service's Railway deploy config
    (build/start commands, domain, env var names) — currently only exists
    in Railway's dashboard with nothing version-controlled to reproduce it.
-7. Consider cleaning up the outer, near-empty `happy-baby-app\` template
+9. Consider cleaning up the outer, near-empty `happy-baby-app\` template
    shell so the nested-repo trap described above doesn't cause confusion
    later (not touched yet — flagging only, across all repos).
