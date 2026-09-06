@@ -184,7 +184,11 @@ async function importProducts() {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(PRODUCTS_XLSX_PATH);
 
-  const worksheet = workbook.worksheets[0];
+  // The template ships with "Instructions" as the first tab and "Products"
+  // second, so worksheets[0] would grab the wrong sheet -- look it up by
+  // name, falling back to the first sheet for any workbook that only has
+  // one (e.g. a stripped-down test fixture).
+  const worksheet = workbook.getWorksheet("Products") ?? workbook.worksheets[0];
   if (!worksheet) {
     summary.errors.push({ row: 0, message: "The workbook has no worksheets." });
     return summary;
