@@ -7,28 +7,41 @@ Happy Shopping is a multi-vertical e-commerce platform (Kids/Men/Women, branded
 one backend, plus three standalone microservices being built to eventually
 sell as independent B2B products. This same file is kept in sync across all
 five repos so any session has the full picture regardless of which repo it
-starts in. Last updated 2026-09-17 (all five repos re-synced this pass -- tryon-service's smart PROVIDER default + Leffa work).
+starts in. Last updated 2026-09-17 (all five repos re-synced this pass -- Railway outage root-caused and fixed for tryon-service, RunPod pod rebuilt after a migration, portal try-on verified end-to-end).
 
-## 🚨 All three Railway microservices are currently unreachable (found 2026-09-06)
+## ✅ Root cause found + partially fixed (2026-09-17): trial expiration, not a domain/rename issue
 
-`happy-baby-fit-engine`, `happy-baby-returns-protection`, and
-`happy-baby-tryon-service` all returned Railway's own **"Application not
-found"** edge error when hit directly (e.g. `GET .../health`) — not a normal
-app-level 404, but Railway's proxy saying the domain no longer maps to a
-running service. All three repos also have a recent, coordinated **"Rename
-package identity from happy-baby to happy-shopping"** commit; the likely
-cause is that rename also touched the Railway services/projects, silently
-changing their auto-generated `*.up.railway.app` domains and orphaning every
-hardcoded URL pointing at the old ones (this app's `TRYON_SERVICE_URL`/
-`RETURNS_SERVICE_URL` env vars, and `happy-baby-app`'s hardcoded
-`FIT_ENGINE_URL`/`RETURNS_SERVICE_URL` constants). `happy-baby` itself
-(Vercel) is still live. **Not yet confirmed end-to-end** (no login
-credentials available to drive it from this pass) whether `/api/try-on`,
-`/admin/returns`, and the mobile app's fit-score/return-case flows are
-actually broken in production as a result — but given the evidence, they
-very likely are. **First thing to do next session: check the Railway
-dashboard for these three services' real current URLs and re-point every
-reference to them.**
+The "Application not found" outage below was **never** about the
+`happy-baby`→`happy-shopping` package rename touching Railway domains —
+that theory (previously this section's leading guess) is now confirmed
+wrong. The real cause, found by logging into the Railway dashboard
+directly: **the account's free trial had expired**, which paused every
+deployment across the account — `happy-baby-fit-engine`,
+`happy-baby-returns-protection`, and `happy-baby-tryon-service` all showed
+"Trial Ended — 0 days remaining" with every service "offline"/"no active
+deployment" (across both Railway projects, `amused-wisdom` and
+`laudable-charm`). Nothing was deleted or renamed — GitHub connections and
+env vars were all intact. `happy-baby` itself (Vercel) was never affected,
+this only ever touched the three Railway-hosted microservices.
+
+**Fixed and verified for `happy-baby-tryon-service` specifically**: the
+account was upgraded to a paid plan, then that repo's service was
+explicitly redeployed (Railway only auto-resumes the *last paused*
+deployment on upgrade, not new commits pushed during the outage) and
+verified end-to-end — including through this app's own portal UI at
+`localhost:3000`: uploaded a real photo via a product's "Try It On" button,
+which correctly hit `/api/try-on` → `TRYON_SERVICE_URL` → the fixed
+tryon-service → RunPod, and rendered a real generated result back in the
+browser.
+
+**Not yet verified**: `happy-baby-fit-engine` and
+`happy-baby-returns-protection` should also be un-paused by the same
+account-wide plan upgrade, but neither was explicitly redeployed or
+health-checked this pass — they may still be serving a stale resumed
+deployment. Check both `/health` endpoints directly and redeploy
+(`railway up`) if needed, the same way tryon-service was fixed, before
+assuming `/admin/returns` or the mobile app's fit-score/return-case flows
+are healthy again.
 
 ## Update history
 
@@ -132,9 +145,9 @@ is the clearest open security gap across all five repos right now.
 |---|------|------|--------|
 | 1 | `happy-baby` | Next.js web app + core backend (Vercel, production) | Live, most mature; has product variant grouping, wholesale/bulk pricing, clothing subcategories, and outfit try-on (see detail section) |
 | 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Feature-complete matching this repo's backend (swatches, bulk-buying, subcategory rail, outfit try-on, WhatsApp share); image-rendering bugs fixed 2026-09-06 |
-| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Person Fit Profiles + Fit Confidence Score | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Renamed `FamilyProfile`→`PersonProfile`, added photo upload |
-| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Otherwise feature-complete per last verification (Cloudinary uploads, admin panel wiring) |
-| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). `PROVIDER` now smart-defaults to self-hosted when configured; Leffa-based replacement server built but not deployed; still no JWT auth |
+| 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Person Fit Profiles + Fit Confidence Score | ⚠️ Railway plan upgraded 2026-09-17 (root cause: trial expiration, see banner above), but not individually redeployed/verified. Renamed `FamilyProfile`→`PersonProfile`, added photo upload |
+| 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | ⚠️ Railway plan upgraded 2026-09-17 (root cause: trial expiration, see banner above), but not individually redeployed/verified. Otherwise feature-complete per last verification (Cloudinary uploads, admin panel wiring) |
+| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | ✅ Railway outage resolved 2026-09-17 (was trial expiration, not a domain issue) and verified end-to-end through the real portal UI. `PROVIDER` smart-defaults to self-hosted when configured; still no JWT auth |
 
 ## Key product strategy — "Fit Certain"
 
@@ -286,6 +299,31 @@ other e-commerce brands once proven inside Happy Shopping.
 ## Per-repo detail
 
 ### 1. happy-baby (this repo — web + core backend)
+
+**Update, 2026-09-17 (local dev testing notes):**
+- **`TryOnPanel` (`app/components/TryOnPanel.tsx`) only renders when
+  `product.category === "Clothing" && product.image` is truthy** (see the
+  conditional in `app/shop/[id]/page.tsx`) — not a bug, but easy to
+  mistake for one: several seeded products have no `image` field set and
+  silently show no try-on UI at all (no error, no fallback message). If
+  "Try It On" is missing on a product page, check the product's `image`
+  field before assuming the component is broken.
+- **Long-running `next dev` servers on this repo have crashed with "Jest
+  worker encountered N child process exceptions, exceeding retry limit"**
+  after being left running for an extended period (observed on an instance
+  up since 2026-09-16) — a Next.js/Turbopack internal compiler-worker
+  crash (the `jest-worker` package Next uses internally for parallelizing
+  builds, unrelated to actual Jest tests), not an application bug. Fix is
+  just killing the stale process and starting a fresh `npm run dev` — but
+  watch for **port squatting**: a stale server holding port 3000 makes a
+  fresh `next dev` silently start on 3001 instead (with only a one-line
+  warning), so a fresh instance can look "not working" when you're
+  actually still hitting the old crashing one on 3000.
+- `TryOnPanel` gates on `useSession()` from `next-auth/react`
+  (`SessionProvider` is correctly wired in `app/layout.tsx` via
+  `AuthProvider` — confirmed directly, this was *not* the cause of the
+  above) — showing "Log in to try this on virtually" instead of the try-on
+  UI for signed-out users, by design.
 
 Next.js 16 (App Router) + React 19, deployed live on Vercel
 (`https://happy-baby-seven.vercel.app`, project `happy-shopping/happy-baby`).
@@ -630,13 +668,15 @@ under plain `Desktop\happy-baby-tryon-service\`, not
 
 ## Immediate next steps
 
-1. 🚨 **Diagnose and fix the Railway outage** — check the Railway dashboard
-   for fit-engine's, returns-protection's, and tryon-service's actual
-   current service URLs, then re-point `TRYON_SERVICE_URL`/
-   `RETURNS_SERVICE_URL` (this repo's Vercel env vars) and
-   `happy-baby-app`'s hardcoded `FIT_ENGINE_URL`/`RETURNS_SERVICE_URL`
-   constants at whatever the real URLs turn out to be. This is now the
-   single biggest blocker across the whole platform.
+1. ✅ ~~Diagnose and fix the Railway outage~~ — **root cause found 2026-09-17**
+   (account-wide trial expiration, not a domain/rename issue) and fixed for
+   `happy-baby-tryon-service` specifically, verified end-to-end including
+   through this app's own portal UI. **Still open**: confirm
+   `happy-baby-fit-engine` and `happy-baby-returns-protection` are actually
+   serving current code (not a stale resumed deployment) via their
+   `/health` endpoints, and re-point `TRYON_SERVICE_URL`/
+   `RETURNS_SERVICE_URL` (this repo's Vercel env vars) if either turns out
+   to need a URL change.
 2. **Confirm `PROVIDER=self-hosted` is actually set on tryon-service**
    once it's reachable again — otherwise every outfit try-on request (a
    feature already shipped in both this repo and the mobile app) fails
