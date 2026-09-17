@@ -7,7 +7,7 @@ Happy Shopping is a multi-vertical e-commerce platform (Kids/Men/Women, branded
 one backend, plus three standalone microservices being built to eventually
 sell as independent B2B products. This same file is kept in sync across all
 five repos so any session has the full picture regardless of which repo it
-starts in. Last updated 2026-09-06 (all five repos re-synced this pass).
+starts in. Last updated 2026-09-17 (all five repos re-synced this pass -- tryon-service's smart PROVIDER default + Leffa work).
 
 ## 🚨 All three Railway microservices are currently unreachable (found 2026-09-06)
 
@@ -134,7 +134,7 @@ is the clearest open security gap across all five repos right now.
 | 2 | `happy-baby-app` (inner copy) | Expo React Native mobile app (SDK 54) | Feature-complete matching this repo's backend (swatches, bulk-buying, subcategory rail, outfit try-on, WhatsApp share); image-rendering bugs fixed 2026-09-06 |
 | 3 | `happy-baby-fit-engine` | Standalone Express/TS API — Person Fit Profiles + Fit Confidence Score | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Renamed `FamilyProfile`→`PersonProfile`, added photo upload |
 | 4 | `happy-baby-returns-protection` | Standalone Express/TS API — tamper-evident return proof | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Otherwise feature-complete per last verification (Cloudinary uploads, admin panel wiring) |
-| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). Self-hosted CatVTON provider now implemented (outfit mode + NSFW detection); still no JWT auth |
+| 5 | `happy-baby-tryon-service` | Standalone Express/TS API — provider-agnostic try-on wrapper | 🚨 Railway URL unreachable as of 2026-09-06 (see banner above). `PROVIDER` now smart-defaults to self-hosted when configured; Leffa-based replacement server built but not deployed; still no JWT auth |
 
 ## Key product strategy — "Fit Certain"
 
@@ -560,6 +560,23 @@ end-to-end against the real shared Supabase database:
 
 ### 5. happy-baby-tryon-service
 
+**Update, 2026-09-17:** Quality pass on try-on output (complaint: default
+free IDM-VTON results looked "pasted-on"). `PROVIDER`'s default is no
+longer a fixed string — it now resolves to `self-hosted` automatically
+when `SELF_HOSTED_ENDPOINT_URL` is set, else `huggingface` (previously
+defaulted to `huggingface` unconditionally, so the already-built
+self-hosted CatVTON path needed an explicit env var to actually be used —
+that's fixed). `HuggingFaceProvider` also gained a second selectable
+Space, `franciszzj/Leffa` (via `HUGGINGFACE_SPACE`), generally higher
+quality than IDM-VTON but not live-verified against its real API (that
+Space was stuck cold-starting for 6+ minutes during testing) — IDM-VTON
+remains the default for reliability. Separately, a new self-hosted
+inference server replacing the RunPod CatVTON server with
+[Leffa](https://github.com/franciszzj/Leffa) now lives at
+`leffa-tryon-server/` inside the tryon-service repo (FastAPI + Docker,
+drop-in for the same `/try-on/single` and `/try-on/outfit` contract) —
+**not deployed anywhere yet**, still sitting as new code.
+
 Express + TypeScript. Thin provider-agnostic wrapper — deliberately no AI
 model logic, just routes to whichever provider `PROVIDER` selects. Lives
 under plain `Desktop\happy-baby-tryon-service\`, not
@@ -583,10 +600,13 @@ under plain `Desktop\happy-baby-tryon-service\`, not
   (the classifier returns a normal 200 with no error field when it
   false-positives, so there's no other signal to detect it by).
 - **Package identity renamed from `happy-baby` to `happy-shopping`.**
-- Default `PROVIDER` env var is still `huggingface` — confirming whether
-  Railway's `PROVIDER` is actually set to `self-hosted` (required for the
-  outfit try-on feature `happy-baby`/`happy-baby-app` already ship) was not
-  possible this pass; see below.
+- `PROVIDER`'s default is now smart (see the 2026-09-17 update note above)
+  — `self-hosted` if `SELF_HOSTED_ENDPOINT_URL` is set, else `huggingface`.
+  What still needs confirming on Railway is that `SELF_HOSTED_ENDPOINT_URL`
+  itself is set to a real, reachable server (required for the outfit
+  try-on feature `happy-baby`/`happy-baby-app` already ship, since
+  `HuggingFaceProvider` explicitly rejects outfit requests) — not possible
+  to confirm this pass given the outage; see below.
 - 🚨 **This service's Railway URL
   (`https://happy-baby-tryon-service-production.up.railway.app`) returned
   "Application not found" when hit directly on 2026-09-06** — the live
